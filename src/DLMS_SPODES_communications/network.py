@@ -73,37 +73,53 @@ class TagsName(Enum):
     PORT = 'port'
 
 
-class GXNet2(Network):
-    reader: asyncio.StreamReader
-    writer: asyncio.StreamWriter
+class AsyncNetwork(Base):
+    reader: asyncio.StreamReader | None
+    writer: asyncio.StreamWriter | None
 
-    def __init__(self):
-        super(GXNet2, self).__init__()
-        self.__aThread = None
-        # in future for async transmitting
+    def __init__(self,
+                 host: str = None,
+                 port: int = 0,
+                 inactivity_timeout: int = 120):
+        """host : Host name.
+        port : Client port number. """
+        super().__init__(inactivity_timeout)
+        self.host_name = host
+        self.port = port
         self.reader = None
         self.writer = None
 
-    def open(self):
+    def __repr__(self):
+        params: list[str] = [F"host='{self.host_name}', port={self.port}"]
+        if self.inactivity_timeout != self.INACTIVITY_TIMEOUT_DEFAULT:
+            params.append(F"inactivity_timeout={self.inactivity_timeout}")
+        return F"{self.__class__.__name__}({', '.join(params)})"
+
+    async def open(self):
         """ coroutine start """
-        asyncio.run(self.listen())
-
-    async def listen(self):
-        """ only for TCP client now """
         self.reader, self.writer = await asyncio.open_connection(self.host_name, self.port)
-        while self.reader:
-            data = await self.reader.readuntil(self.eop)
-            if self.__lock.locked():
-                with self.sync:
-                    self.recv_buff.extend(data)
-                    self.recv_event.set()
-            else:
-                self.recv_buff.clear()
 
-    def send(self, data: bytes, receiver=None):
-        if self.writer:
+    async def close(self):
+        if not self.writer.is_closing():
+            self.writer.close()
+            await self.writer.wait_closed()
+
+    def is_open(self):
+        return not self.writer.is_closing()
+
+    async def send(self, data: bytes, receiver=None):
+        if not self.writer:
             raise Exception("Invalid connection.")
+        await self.writer.drain()
         self.writer.write(data)
 
-    def close(self):
-        raise NotImplementedError
+    async def receive(self, buf: bytearray) -> bool:
+        try:
+            while True:
+                buf.extend(await asyncio.wait_for(
+                    fut=self.reader.read(1000),
+                    timeout=self.inactivity_timeout))
+                if buf[-1:] == b"\x7e" and len(buf) > 1:
+                    return True
+        except TimeoutError:
+            return False
