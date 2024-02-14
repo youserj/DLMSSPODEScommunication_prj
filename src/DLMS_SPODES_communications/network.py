@@ -1,7 +1,7 @@
 import asyncio
 from enum import Enum
 import socket
-from .base import Base
+from .base import Base, StreamBase
 
 
 class Network(Base):
@@ -73,9 +73,7 @@ class TagsName(Enum):
     PORT = 'port'
 
 
-class AsyncNetwork(Base):
-    reader: asyncio.StreamReader | None
-    writer: asyncio.StreamWriter | None
+class AsyncNetwork(StreamBase):
 
     def __init__(self,
                  host: str = None,
@@ -86,8 +84,6 @@ class AsyncNetwork(Base):
         super().__init__(inactivity_timeout)
         self.host_name = host
         self.port = port
-        self.reader = None
-        self.writer = None
 
     def __repr__(self):
         params: list[str] = [F"host='{self.host_name}', port={self.port}"]
@@ -97,29 +93,6 @@ class AsyncNetwork(Base):
 
     async def open(self):
         """ coroutine start """
-        self.reader, self.writer = await asyncio.open_connection(self.host_name, self.port)
-
-    async def close(self):
-        if not self.writer.is_closing():
-            self.writer.close()
-            await self.writer.wait_closed()
-
-    def is_open(self):
-        return not self.writer.is_closing()
-
-    async def send(self, data: bytes, receiver=None):
-        if not self.writer:
-            raise Exception("Invalid connection.")
-        await self.writer.drain()
-        self.writer.write(data)
-
-    async def receive(self, buf: bytearray) -> bool:
-        try:
-            while True:
-                buf.extend(await asyncio.wait_for(
-                    fut=self.reader.read(1000),
-                    timeout=self.inactivity_timeout))
-                if buf[-1:] == b"\x7e" and len(buf) > 1:
-                    return True
-        except TimeoutError:
-            return False
+        self.reader, self.writer = await asyncio.open_connection(
+            host=self.host_name,
+            port=self.port)

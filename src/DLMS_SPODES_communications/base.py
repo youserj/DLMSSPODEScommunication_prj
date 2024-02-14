@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import asyncio
 
 
 class Base(ABC):
@@ -42,3 +43,39 @@ class Base(ABC):
     @abstractmethod
     def receive(self, buf: bytearray) -> bool:
         """ Receive new data synchronously from the media. Result in p.reply. Return True if new data is received. """
+
+
+class StreamBase(Base, ABC):
+    reader: asyncio.StreamReader | None
+    writer: asyncio.StreamWriter | None
+
+    def __init__(self,
+                 inactivity_timeout: int = 120):
+        super().__init__(inactivity_timeout)
+        self.reader = None
+        self.writer = None
+
+    async def close(self):
+        if not self.writer.is_closing():
+            self.writer.close()
+            await self.writer.wait_closed()
+
+    def is_open(self):
+        return not self.writer.is_closing()
+
+    async def send(self, data: bytes, receiver=None):
+        if not self.writer:
+            raise Exception("Invalid connection.")
+        await self.writer.drain()
+        self.writer.write(data)
+
+    async def receive(self, buf: bytearray) -> bool:
+        try:
+            while True:
+                buf.extend(await asyncio.wait_for(
+                    fut=self.reader.read(1000),
+                    timeout=self.inactivity_timeout))
+                if buf[-1:] == b"\x7e" and len(buf) > 1:
+                    return True
+        except TimeoutError:
+            return False
