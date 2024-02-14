@@ -1,6 +1,6 @@
 from .network import Network, AsyncNetwork
 from .ble import BLE
-from .serial_port import SerialPort, RS485
+from .serial_port import SerialPort, RS485, AsyncSerial
 # import argparse
 import sys
 
