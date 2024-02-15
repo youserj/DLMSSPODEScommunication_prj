@@ -61,7 +61,10 @@ class StreamBase(Base, ABC):
             await self.writer.wait_closed()
 
     def is_open(self):
-        return not self.writer.is_closing()
+        if self.writer:
+            return not self.writer.is_closing()
+        else:
+            return False
 
     async def send(self, data: bytes, receiver=None):
         if not self.writer:
