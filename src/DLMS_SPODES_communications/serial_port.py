@@ -113,11 +113,11 @@ class AsyncSerial(StreamBase):
                  inactivity_timeout: int = 120,
                  send_timeout: int = 1):
         super().__init__(inactivity_timeout)
-        self.url = port
+        self.port = port
         self.baudrate = baudrate
 
     def __repr__(self):
-        params: list[str] = [F"port='{self.url}'"]
+        params: list[str] = [F"port='{self.port}'"]
         if self.baudrate != BAUD_RATE:
             params.append(F"baudrate={self.baudrate}")
         # if self.__client.bytesize != serial.EIGHTBITS:
@@ -129,5 +129,5 @@ class AsyncSerial(StreamBase):
     async def open(self):
         """ coroutine start """
         self.reader, self.writer = await open_serial_connection(
-            url=self.url,
+            url=self.port,
             baudrate=self.baudrate)
