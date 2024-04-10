@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from serial_asyncio import open_serial_connection
 import serial
@@ -131,3 +132,7 @@ class AsyncSerial(StreamBase):
         self.reader, self.writer = await open_serial_connection(
             url=self.port,
             baudrate=self.baudrate)
+
+    async def close(self):
+        await asyncio.sleep(.1)  # need delay before close writer
+        await super(AsyncSerial, self).close()
