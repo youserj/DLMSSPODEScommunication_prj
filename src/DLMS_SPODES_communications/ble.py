@@ -71,7 +71,7 @@ class BLE(Base):
         return F"{self.__class__.__name__}({', '.join(params)})"
 
     def __str__(self):
-        return F"{self.__class__.__name__}: {self.__client.address}"
+        return F"{self.__client.address}"
 
     @property
     def client(self) -> bleak.BleakClient:

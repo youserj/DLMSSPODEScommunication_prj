@@ -96,3 +96,6 @@ class AsyncNetwork(StreamBase):
         self.reader, self.writer = await asyncio.open_connection(
             host=self.host_name,
             port=self.port)
+
+    def __str__(self):
+        return F"{self.host_name}:{self.port}"

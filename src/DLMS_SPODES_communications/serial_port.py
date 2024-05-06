@@ -136,3 +136,6 @@ class AsyncSerial(StreamBase):
     async def close(self):
         await asyncio.sleep(.1)  # need delay before close writer
         await super(AsyncSerial, self).close()
+
+    def __str__(self):
+        return F"{self.port},{self.baudrate}"
