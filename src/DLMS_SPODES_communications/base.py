@@ -50,7 +50,7 @@ class StreamBase(Base, ABC):
     writer: asyncio.StreamWriter | None
 
     def __init__(self,
-                 inactivity_timeout: int = 120):
+                 inactivity_timeout: int = 120):  # remove in future
         super().__init__(inactivity_timeout)
         self.reader = None
         self.writer = None
@@ -72,13 +72,9 @@ class StreamBase(Base, ABC):
         await self.writer.drain()
         self.writer.write(data)
 
-    async def receive(self, buf: bytearray) -> bool:
-        try:
-            while True:
-                buf.extend(await asyncio.wait_for(
-                    fut=self.reader.read(1000),
-                    timeout=self.inactivity_timeout))
-                if buf[-1:] == b"\x7e" and len(buf) > 1:
-                    return True
-        except TimeoutError:
-            return False
+    async def receive(self, buf: bytearray):
+        while True:
+            buf.extend(await self.reader.read())
+            if buf[-1:] == b"\x7e" and len(buf) > 1:
+                return
+            await asyncio.sleep(.000001)
