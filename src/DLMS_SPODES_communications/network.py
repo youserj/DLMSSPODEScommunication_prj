@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 from enum import Enum
 import socket
 from .base import Base, StreamBase
@@ -73,29 +74,20 @@ class TagsName(Enum):
     PORT = 'port'
 
 
+@dataclass
 class AsyncNetwork(StreamBase):
-
-    def __init__(self,
-                 host: str = None,
-                 port: int = 0,
-                 inactivity_timeout: int = 120):
-        """host : Host name.
-        port : Client port number. """
-        super().__init__(inactivity_timeout)
-        self.host_name = host
-        self.port = port
+    host: str = None
+    port: int = 0
 
     def __repr__(self):
-        params: list[str] = [F"host='{self.host_name}', port={self.port}"]
-        if self.inactivity_timeout != self.INACTIVITY_TIMEOUT_DEFAULT:
-            params.append(F"inactivity_timeout={self.inactivity_timeout}")
+        params: list[str] = [F"host='{self.host}', port={self.port}"]
         return F"{self.__class__.__name__}({', '.join(params)})"
 
     async def open(self):
         """ coroutine start """
         self.reader, self.writer = await asyncio.open_connection(
-            host=self.host_name,
+            host=self.host,
             port=self.port)
 
     def __str__(self):
-        return F"{self.host_name}:{self.port}"
+        return F"{self.host}:{self.port}"

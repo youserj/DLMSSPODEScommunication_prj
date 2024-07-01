@@ -7,7 +7,7 @@ class TestType(unittest.TestCase):
     def test_Network(self):
         driver = Network(
             host="127.0.0.1",
-            port=8888)
+            port=10000)
         driver.open()
         print(F"{driver.is_open()=}")
         data = bytes.fromhex("7E A0 07 03 21 93 0F 01 7E")

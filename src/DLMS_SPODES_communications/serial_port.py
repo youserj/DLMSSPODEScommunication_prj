@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 from typing import Any
 from serial_asyncio import open_serial_connection
 import serial
@@ -106,25 +107,15 @@ class RS485(SerialPort):
 medias: dict[str, list[RS485, int]] = dict()
 
 
+@dataclass
 class AsyncSerial(StreamBase):
-
-    def __init__(self,
-                 port: str,
-                 baudrate: int = 9600,
-                 inactivity_timeout: int = 120,
-                 send_timeout: int = 1):
-        super().__init__(inactivity_timeout)
-        self.port = port
-        self.baudrate = baudrate
+    port: str = "COM3"
+    baudrate: int = 9600
 
     def __repr__(self):
         params: list[str] = [F"port='{self.port}'"]
         if self.baudrate != BAUD_RATE:
             params.append(F"baudrate={self.baudrate}")
-        # if self.__client.bytesize != serial.EIGHTBITS:
-        #     params.append(F"dataBits={self.__client.bytesize}")
-        if self.inactivity_timeout != self.INACTIVITY_TIMEOUT_DEFAULT:
-            params.append(F"inactivity_timeout={self.inactivity_timeout}")
         return F"{self.__class__.__name__}({', '.join(params)})"
 
     async def open(self):

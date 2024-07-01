@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 import asyncio
 
 
@@ -45,15 +46,11 @@ class Base(ABC):
         """ Receive new data synchronously from the media. Result in p.reply. Return True if new data is received. """
 
 
-class StreamBase(Base, ABC):
-    reader: asyncio.StreamReader | None
-    writer: asyncio.StreamWriter | None
-
-    def __init__(self,
-                 inactivity_timeout: int = 120):  # remove in future
-        super().__init__(inactivity_timeout)
-        self.reader = None
-        self.writer = None
+@dataclass
+class StreamBase(ABC):
+    reader: asyncio.StreamReader | None = field(init=False, default=None)
+    writer: asyncio.StreamWriter | None = field(init=False, default=None)
+    recv_size: int = field(default=0xffff)
 
     async def close(self):
         if not self.writer.is_closing():
@@ -74,7 +71,15 @@ class StreamBase(Base, ABC):
 
     async def receive(self, buf: bytearray):
         while True:
-            buf.extend(await self.reader.read())
+            buf.extend(await self.reader.read(self.recv_size))
             if buf[-1:] == b"\x7e" and len(buf) > 1:
                 return
             await asyncio.sleep(.000001)
+
+    @abstractmethod
+    def open(self):
+        """Opens the media."""
+
+    @abstractmethod
+    def __repr__(self):
+        """return all properties for restore"""
