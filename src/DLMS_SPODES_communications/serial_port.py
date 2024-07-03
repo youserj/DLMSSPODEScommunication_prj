@@ -62,13 +62,11 @@ class RS485(Serial):
 
     async def send(self, data: bytes, receiver=None):
         await self.lock.acquire()
-        print("Locked")
         await super().send(data, receiver)
 
     async def receive(self, buf: bytearray):
         await super(RS485, self).receive(buf)
         self.lock.release()
-        print("Release")
 
 
 @dataclass
