@@ -4,7 +4,7 @@ import asyncio
 
 
 @dataclass
-class Base(ABC):
+class Media(ABC):
     recv_size: int = field(default=0xffff, init=False)
 
     @abstractmethod
@@ -33,7 +33,7 @@ class Base(ABC):
 
 
 @dataclass
-class StreamBase(Base, ABC):
+class StreamMedia(Media, ABC):
     reader: asyncio.StreamReader | None = field(init=False, default=None)
     writer: asyncio.StreamWriter | None = field(init=False, default=None)
 

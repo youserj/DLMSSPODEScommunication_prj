@@ -1,7 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
-from .base import StreamBase
+from .base import StreamMedia
 
 
 class TagsName(Enum):
@@ -10,7 +10,7 @@ class TagsName(Enum):
 
 
 @dataclass
-class Network(StreamBase):
+class Network(StreamMedia):
     host: str = None
     port: int = 0
 

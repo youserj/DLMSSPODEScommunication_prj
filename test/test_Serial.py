@@ -1,44 +1,44 @@
 import asyncio
 import unittest
 from src.DLMS_SPODES_communications.serial_port import Serial, RS485, medias
+from .functools2 import open_close
 
 
 class TestType(unittest.TestCase):
+    m = Serial(port="COM13")
+
+    def test_open_close(self):
+        asyncio.run(open_close(self.m))
+
     def test_Serial(self):
-        async def main(d: Serial):
-            await d.open()
-            print(F"{driver.is_open()=}")
+        async def main(m: Serial):
+            await m.open()
             data = bytes.fromhex("7E A0 07 03 21 93 0F 01 7E")
-            await driver.send(data)
+            await m.send(data)
             buf = bytearray()
             await asyncio.wait_for(
-                fut=driver.receive(buf),
+                fut=m.receive(buf),
                 timeout=3)
             print(F"{buf.hex(' ')=}")
-            await d.close()
+            await m.close()
 
-        driver = Serial(
-            port="COM13")
-        asyncio.run(main(driver))
+        asyncio.run(main(self.m))
 
     def test_Serial_without_recv(self):
-        async def main(d: Serial):
-            await d.open()
-            print(F"{driver.is_open()=}")
+        async def main(m: Serial):
+            await m.open()
             data = bytes.fromhex("7E A0 07 05 21 93 0F 01 7E")
-            await driver.send(data)
-            await d.close()
+            await m.send(data)
+            await m.close()
             print("1 end")
-            await d.open()
-            print(F"{driver.is_open()=}")
+            await m.open()
+            print(F"{m.is_open()=}")
             data = bytes.fromhex("7E A0 07 06 21 93 0F 01 7E")
-            await driver.send(data)
-            await d.close()
+            await m.send(data)
+            await m.close()
             print("2 end")
 
-        driver = Serial(
-            port="COM13")
-        asyncio.run(main(driver))
+        asyncio.run(main(self.m))
 
     def test_RS485_open_close(self):
         async def main():
@@ -53,7 +53,7 @@ class TestType(unittest.TestCase):
             print(F"{d1.is_open()=} {medias[d1.port].n_connected=}")
             await d2.close()
             await d1.close()
-            print(F"{medias[d1.port].n_connected=}")
+            print(F"{medias=}")
 
         d1 = RS485(
             port="COM13")

@@ -9,7 +9,7 @@ package-dir = {"" = "src"}
 
 [project]
 name = "DLMS_SPODES_communications"
-version = "1.4.1"
+version = "1.4.2"
 authors = [
     {name="Serj Kotilevski", email="youserj@outlook.com"}
 ]

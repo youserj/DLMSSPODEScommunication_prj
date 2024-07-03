@@ -1,13 +1,13 @@
 import asyncio
 from dataclasses import dataclass, field
 from serial_asyncio import open_serial_connection
-from .base import StreamBase
+from .base import StreamMedia
 
 BAUD_RATE: int = 9600
 
 
 @dataclass
-class Serial(StreamBase):
+class Serial(StreamMedia):
     port: str = "COM3"
     baudrate: int = 9600
 

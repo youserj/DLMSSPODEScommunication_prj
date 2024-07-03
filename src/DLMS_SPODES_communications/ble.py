@@ -1,12 +1,12 @@
 import asyncio
 import bleak
-from .base import Base
+from .base import Media
 from netaddr import EUI, mac_unix_expanded
 from bleak.backends.bluezdbus.defs import GATT_CHARACTERISTIC_INTERFACE
 from bleak.backends.winrt.client import GattCharacteristicProperties, GattCharacteristic
 
 
-class BLEKPZ(Base):
+class BLEKPZ(Media):
     """KPZ implemented"""
     HDLC_FLAG = b"\x7E"
     DLMS_SERVICE_UUID: str = "0000ffe5-0000-1000-8000-00805f9b34fb"
@@ -17,7 +17,7 @@ class BLEKPZ(Base):
     SEND_BUF_SIZE_OLD: int = 1
     READY_OK: bytes = b'\x01'
     __addr: EUI
-    __client: bleak.BleakClient
+    __client: bleak.BleakClient = None
     __send_buf: bytearray
     __chunk_is_send: asyncio.Event
     __send_buf_uuid: str
@@ -77,7 +77,10 @@ class BLEKPZ(Base):
         self.recv_buff.clear()
 
     def is_open(self):
-        return self.__client.is_connected
+        if self.__client and self.__client.is_connected:
+            return True
+        else:
+            return False
 
     async def close(self):
         """close connection with blocking until close ble session"""
