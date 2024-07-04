@@ -37,7 +37,7 @@ class RS485(Serial):
 
     def __new__(cls,
                 port: str,
-                baudrate: int = 9600):
+                baudrate: str = 9600):
         if port not in medias.keys():
             new = super().__new__(cls)
             medias[port] = SerialConnector(new, 0)
