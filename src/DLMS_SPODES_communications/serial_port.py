@@ -9,7 +9,7 @@ BAUD_RATE: int = 9600
 @dataclass
 class Serial(StreamMedia):
     port: str = "COM3"
-    baudrate: int = 9600
+    baudrate: str = '9600'
 
     def __repr__(self):
         params: list[str] = [F"port='{self.port}'"]

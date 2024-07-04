@@ -28,13 +28,13 @@ class BLEKPZ(Media):
 
     def __init__(self,
                  address: str | EUI = None,
-                 discovery_timeout: int = 10):
+                 discovery_timeout: str = '10'):
         """ address: bluetooth mac address.
         port : Client port number. """
         self.__addr = EUI(address)
         """bluetooth mac address"""
         self.__addr.dialect = mac_unix_expanded  # for representation
-        self.discovery_timeout = discovery_timeout
+        self.discovery_timeout = int(discovery_timeout)
         self.octet_timeout = self.OCTET_TIMEOUT_DEFAULT
 
     async def __connect(self):

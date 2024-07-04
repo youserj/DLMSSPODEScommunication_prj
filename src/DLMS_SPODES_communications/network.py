@@ -11,8 +11,8 @@ class TagsName(Enum):
 
 @dataclass
 class Network(StreamMedia):
-    host: str = None
-    port: int = 0
+    host: str = "127.0.0.1"
+    port: str = '4059'
 
     def __repr__(self):
         params: list[str] = [F"host='{self.host}', port={self.port}"]
