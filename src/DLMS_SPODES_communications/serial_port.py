@@ -19,7 +19,7 @@ class Serial(StreamMedia):
 
     async def open(self):
         """ coroutine start """
-        self.reader, self.writer = await open_serial_connection(
+        self._reader, self._writer = await open_serial_connection(
             url=self.port,
             baudrate=self.baudrate)
 

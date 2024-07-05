@@ -20,7 +20,7 @@ class Network(StreamMedia):
 
     async def open(self):
         """ coroutine start """
-        self.reader, self.writer = await asyncio.open_connection(
+        self._reader, self._writer = await asyncio.open_connection(
             host=self.host,
             port=self.port)
 

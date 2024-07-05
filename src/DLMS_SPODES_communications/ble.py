@@ -83,7 +83,7 @@ class BLEKPZ(Media):
         await self.__client.disconnect()
 
     def __repr__(self):
-        params: list[str] = [F"address='{self.__client.address}'"]
+        params: list[str] = [F"addr='{self.__client.address}'"]
         if self.discovery_timeout != self.DISCOVERY_TIMEOUT_DEFAULT:
             params.append(F"discovery_timeout={self.discovery_timeout}")
         return F"{self.__class__.__name__}({', '.join(params)})"

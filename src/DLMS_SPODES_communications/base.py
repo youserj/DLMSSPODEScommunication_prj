@@ -34,29 +34,29 @@ class Media(ABC):
 
 @dataclass
 class StreamMedia(Media, ABC):
-    reader: asyncio.StreamReader | None = field(init=False, default=None)
-    writer: asyncio.StreamWriter | None = field(init=False, default=None)
+    _reader: asyncio.StreamReader | None = field(init=False, default=None)
+    _writer: asyncio.StreamWriter | None = field(init=False, default=None)
 
     def is_open(self):
-        if self.writer:
-            return not self.writer.is_closing()
+        if self._writer:
+            return not self._writer.is_closing()
         else:
             return False
 
     async def close(self):
-        if not self.writer.is_closing():
-            self.writer.close()
-            await self.writer.wait_closed()
+        if not self._writer.is_closing():
+            self._writer.close()
+            await self._writer.wait_closed()
 
     async def send(self, data: bytes, receiver=None):
-        if not self.writer:
+        if not self._writer:
             raise Exception("Invalid connection.")
-        await self.writer.drain()
-        self.writer.write(data)
+        await self._writer.drain()
+        self._writer.write(data)
 
     async def receive(self, buf: bytearray):
         while True:
-            buf.extend(await self.reader.read(self.recv_size))
+            buf.extend(await self._reader.read(self.recv_size))
             if buf[-1:] == b"\x7e" and len(buf) > 1:
                 return
             await asyncio.sleep(.000001)
