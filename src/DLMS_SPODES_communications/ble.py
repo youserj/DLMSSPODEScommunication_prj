@@ -1,14 +1,12 @@
 import asyncio
 import bleak
 from .base import Media
-from netaddr import EUI, mac_unix_expanded
 from bleak.backends.bluezdbus.defs import GATT_CHARACTERISTIC_INTERFACE
 from bleak.backends.winrt.client import GattCharacteristicProperties, GattCharacteristic
 
 
 class BLEKPZ(Media):
     """KPZ implemented"""
-    HDLC_FLAG = b"\x7E"
     DLMS_SERVICE_UUID: str = "0000ffe5-0000-1000-8000-00805f9b34fb"
     DLMS_RECV_BUF_UUID: str = "0000fff4-0000-1000-8000-00805f9b34fb"
     DLMS_SEND_BUF_UUID: str = "0000fff5-0000-1000-8000-00805f9b34fb"
@@ -16,7 +14,6 @@ class BLEKPZ(Media):
     SEND_BUF_SIZE: int = 20
     SEND_BUF_SIZE_OLD: int = 1
     READY_OK: bytes = b'\x01'
-    __addr: EUI
     __client: bleak.BleakClient = None
     __send_buf: bytearray
     __chunk_is_send: asyncio.Event
@@ -27,21 +24,20 @@ class BLEKPZ(Media):
     """in sec"""
 
     def __init__(self,
-                 address: str | EUI = None,
+                 addr: str,
                  discovery_timeout: str = '10'):
         """ address: bluetooth mac address.
         port : Client port number. """
-        self.__addr = EUI(address)
+        self.addr: str = addr
         """bluetooth mac address"""
-        self.__addr.dialect = mac_unix_expanded  # for representation
         self.discovery_timeout = int(discovery_timeout)
-        self.octet_timeout = self.OCTET_TIMEOUT_DEFAULT
+        self._octet_timeout = self.OCTET_TIMEOUT_DEFAULT
 
     async def __connect(self):
         self.__chunk_is_send = asyncio.Event()
         """send buffer locker"""
         self.__client = bleak.BleakClient(
-            address_or_ble_device=str(self.__addr),
+            address_or_ble_device=self.addr,
             timeout=self.discovery_timeout,
             winrt=dict(use_cached_services=True))
         await self.__client.connect()
@@ -93,7 +89,7 @@ class BLEKPZ(Media):
         return F"{self.__class__.__name__}({', '.join(params)})"
 
     def __str__(self):
-        return F"{self.__addr}"
+        return F"{self.addr}"
 
     async def receive(self, buf: bytearray):
         while True:
@@ -120,7 +116,7 @@ class BLEKPZ(Media):
                 self.__chunk_is_send.clear()
                 await asyncio.wait_for(
                     fut=self.__send_chunk(c_data),
-                    timeout=self.octet_timeout)
+                    timeout=self._octet_timeout)
                 pos += self.SEND_BUF_SIZE
 
     @classmethod

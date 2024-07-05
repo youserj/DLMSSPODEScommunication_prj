@@ -6,7 +6,7 @@ from .functools2 import open_close
 
 class TestType(unittest.TestCase):
     m = BLEKPZ(
-        address="6C:79:B8:C4:DB:E3")
+        addr="6C:79:B8:C4:DB:E3")
 
     def test_open_close(self):
         asyncio.run(open_close(self.m))
