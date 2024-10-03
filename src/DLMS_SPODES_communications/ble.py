@@ -2,8 +2,8 @@ import asyncio
 import bleak
 from .base import Media
 from bleak.backends.bluezdbus.defs import GATT_CHARACTERISTIC_INTERFACE
-from bleak.backends.winrt.client import GattCharacteristicProperties, GattCharacteristic
-
+from bleak.backends.winrt.client import GattCharacteristicProperties, GattCharacteristic, logger, BLEDevice
+import winrt.windows.foundation.collections  # for pyinstaller
 
 class BLEKPZ(Media):
     """KPZ implemented"""
@@ -22,13 +22,14 @@ class BLEKPZ(Media):
     """in sec"""
     OCTET_TIMEOUT_DEFAULT: float = 1.0
     """in sec"""
+    addr: str
 
     def __init__(self,
                  addr: str,
                  discovery_timeout: str = '10'):
         """ address: bluetooth mac address.
         port : Client port number. """
-        self.addr: str = addr
+        self.addr = addr
         """bluetooth mac address"""
         self.discovery_timeout = int(discovery_timeout)
         self._octet_timeout = self.OCTET_TIMEOUT_DEFAULT
@@ -39,17 +40,18 @@ class BLEKPZ(Media):
         self.__client = bleak.BleakClient(
             address_or_ble_device=self.addr,
             timeout=self.discovery_timeout,
-            winrt=dict(use_cached_services=True))
+            # winrt=dict(use_cached_services=True)
+        )
         await self.__client.connect()
-        self.recv_buff = bytearray()
+        self._recv_buff = bytearray()
         self.__send_buf = bytearray()
         """ initiate buffer for send to server"""
-        self.buf_locker = asyncio.Lock()
+        self._buf_locker = asyncio.Lock()
 
     async def open(self):
         async def put_recv_buf(sender: GATT_CHARACTERISTIC_INTERFACE, data: bytearray):
-            async with self.buf_locker:
-                self.recv_buff.extend(data)
+            async with self._buf_locker:
+                self._recv_buff.extend(data)
 
         def ready_handle(sender: GATT_CHARACTERISTIC_INTERFACE, ack: bytearray):
             if ack == self.READY_OK:
@@ -70,7 +72,7 @@ class BLEKPZ(Media):
                 callback=ready_handle)
         else:
             await self.close()
-        self.recv_buff.clear()
+        self._recv_buff.clear()
 
     def is_open(self):
         if self.__client and self.__client.is_connected:
@@ -93,10 +95,10 @@ class BLEKPZ(Media):
 
     async def receive(self, buf: bytearray):
         while True:
-            if self.recv_buff[-1:] == b"\x7e" and len(self.recv_buff) > 1:
-                async with self.buf_locker:
-                    buf.extend(self.recv_buff)
-                    self.recv_buff.clear()
+            if self._recv_buff[-1:] == b"\x7e" and len(self._recv_buff) > 1:
+                async with self._buf_locker:
+                    buf.extend(self._recv_buff)
+                    self._recv_buff.clear()
                 return
             await asyncio.sleep(.000001)
 
