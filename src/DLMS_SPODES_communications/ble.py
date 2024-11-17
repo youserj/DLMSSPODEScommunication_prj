@@ -1,9 +1,14 @@
 import asyncio
+import os
 import bleak
 from .base import Media
 from bleak.backends.bluezdbus.defs import GATT_CHARACTERISTIC_INTERFACE
-from bleak.backends.winrt.client import GattCharacteristicProperties, GattCharacteristic, logger, BLEDevice
-import winrt.windows.foundation.collections  # for pyinstaller
+if os.name == "nt":
+    from bleak.backends.winrt.client import GattCharacteristicProperties, GattCharacteristic, logger
+    import winrt.windows.foundation.collections  # for pyinstaller
+elif os.name == "posix":
+    """skip, not available"""
+
 
 class BLEKPZ(Media):
     """KPZ implemented"""
