@@ -2,10 +2,14 @@ import asyncio
 import os
 import bleak
 from .base import Media
-from bleak.backends.bluezdbus.defs import GATT_CHARACTERISTIC_INTERFACE
+from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData
+from bleak.backends import characteristic
+from bleak import exc
 if os.name == "nt":
-    from bleak.backends.winrt.client import GattCharacteristicProperties, GattCharacteristic, logger
-    import winrt.windows.foundation.collections  # for pyinstaller
+    from winrt.windows.devices.bluetooth.genericattributeprofile import GattCharacteristicProperties, GattCharacteristic
+    # ruff: noqa: F401
+    import winrt.windows.foundation.collections  # use for pyinstaller
 elif os.name == "posix":
     """skip, not available"""
 
@@ -18,8 +22,8 @@ class BLEKPZ(Media):
     DLMS_READY_UUID: str = "0000ffe0-0000-1000-8000-00805f9b34fb"
     SEND_BUF_SIZE: int = 20
     SEND_BUF_SIZE_OLD: int = 1
-    READY_OK: bytes = b'\x01'
-    __client: bleak.BleakClient = None
+    READY_OK: bytes = b"\x01"
+    __client: bleak.BleakClient
     __send_buf: bytearray
     __chunk_is_send: asyncio.Event
     __send_buf_uuid: str
@@ -31,7 +35,7 @@ class BLEKPZ(Media):
 
     def __init__(self,
                  addr: str,
-                 discovery_timeout: str = '10'):
+                 discovery_timeout: str = "10") -> None:
         """ address: bluetooth mac address.
         port : Client port number. """
         self.addr = addr
@@ -39,7 +43,7 @@ class BLEKPZ(Media):
         self.discovery_timeout = int(discovery_timeout)
         self._octet_timeout = self.OCTET_TIMEOUT_DEFAULT
 
-    async def __connect(self):
+    async def __connect(self) -> None:
         self.__chunk_is_send = asyncio.Event()
         """send buffer locker"""
         self.__client = bleak.BleakClient(
@@ -53,20 +57,20 @@ class BLEKPZ(Media):
         """ initiate buffer for send to server"""
         self._buf_locker = asyncio.Lock()
 
-    async def open(self):
-        async def put_recv_buf(sender: GATT_CHARACTERISTIC_INTERFACE, data: bytearray):
+    async def open(self) -> None:
+        async def put_recv_buf(_sender: characteristic.BleakGATTCharacteristic, data: bytearray) -> None:
             async with self._buf_locker:
                 self._recv_buff.extend(data)
 
-        def ready_handle(sender: GATT_CHARACTERISTIC_INTERFACE, ack: bytearray):
+        def ready_handle(_sender: characteristic.BleakGATTCharacteristic, ack: bytearray) -> None:
             if ack == self.READY_OK:
                 self.__chunk_is_send.set()
             else:
-                raise ConnectionError(F"got {ack=}, expected {self.READY_OK}")
+                raise ConnectionError(F"got {ack=!r}, expected {self.READY_OK!r}")
 
         await self.__connect()
         # search necessary services
-        uuid_services: tuple[str] = tuple(s.uuid for s in self.__client.services)
+        uuid_services: tuple[str, ...] = tuple(s.uuid for s in self.__client.services)
         if self.DLMS_SERVICE_UUID in uuid_services:
             self.__send_buf_uuid = self.DLMS_SEND_BUF_UUID
             await self.__client.start_notify(
@@ -79,77 +83,76 @@ class BLEKPZ(Media):
             await self.close()
         self._recv_buff.clear()
 
-    def is_open(self):
-        if self.__client and self.__client.is_connected:
-            return True
-        else:
-            return False
+    def is_open(self) -> bool:
+        return (
+            hasattr(self, "__client")
+            and self.__client.is_connected
+        )
 
-    async def close(self):
+    async def close(self) -> None:
         """close connection with blocking until close ble session"""
         await self.__client.disconnect()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         params: list[str] = [F"addr='{self.__client.address}'"]
         if self.discovery_timeout != self.DISCOVERY_TIMEOUT_DEFAULT:
             params.append(F"discovery_timeout={self.discovery_timeout}")
         return F"{self.__class__.__name__}({', '.join(params)})"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return F"{self.addr}"
 
-    async def receive(self, buf: bytearray):
+    async def receive(self, buf: bytearray) -> bool:
         while True:
             if self._recv_buff[-1:] == b"\x7e" and len(self._recv_buff) > 1:
                 async with self._buf_locker:
                     buf.extend(self._recv_buff)
                     self._recv_buff.clear()
-                return
+                return True
             await asyncio.sleep(.000001)
 
-    async def __send_chunk(self, data: bytes):
+    async def __send_chunk(self, data: bytes) -> None:
         # print(F"SEND: {data}")
-        await self.__client.write_gatt_char(self.__send_buf_uuid, data, True)
+        await self.__client.write_gatt_char(self.__send_buf_uuid, data, response=True)
         await self.__chunk_is_send.wait()
 
-    async def send(self, data: bytes, receiver=None):
+    async def send(self, data: bytes) -> None:
         """"""
         if not self.__client.is_connected:
             raise ConnectionError("BLE no connection")
         # TODO: add notification, see in GXNet.py
-        else:
-            pos: int = 0
-            while c_data := data[pos: pos + self.SEND_BUF_SIZE]:
-                self.__chunk_is_send.clear()
-                await asyncio.wait_for(
-                    fut=self.__send_chunk(c_data),
-                    timeout=self._octet_timeout)
-                pos += self.SEND_BUF_SIZE
+        pos: int = 0
+        while c_data := data[pos: pos + self.SEND_BUF_SIZE]:
+            self.__chunk_is_send.clear()
+            await asyncio.wait_for(
+                fut=self.__send_chunk(c_data),
+                timeout=self._octet_timeout)
+            pos += self.SEND_BUF_SIZE
 
     @classmethod
-    async def search(cls, timeout: int) -> dict:
+    async def search(cls, timeout: int) -> dict[str, tuple[BLEDevice, AdvertisementData]]:
         scaner = bleak.BleakScanner()
-        devices = await scaner.discover(timeout=timeout,
-                                        return_adv=True)
-        return devices
+        return await scaner.discover(
+            timeout=timeout,
+            return_adv=True
+        )
 
     async def get_characteristics(self) -> dict[str, bytes]:
         """todo: need refactoring with translate exception to outside"""
-        ret: dict[str, bytes] = dict()
+        ret: dict[str, bytes] = {}
         await self.__connect()
         try:
             for s in self.__client.services:
-                for c in s.characteristics:
-                    c: bleak.BleakGATTCharacteristic
-                    gatt_c: GattCharacteristic = c.obj
+                for chc in s.characteristics:
+                    gatt_c: GattCharacteristic = chc.obj
                     if gatt_c.characteristic_properties == GattCharacteristicProperties.READ:
                         try:
-                            c_data = await self.__client.read_gatt_char(c)
+                            c_data = await self.__client.read_gatt_char(chc)
                         except Exception as e:
                             c_data = e.args[0]
                         finally:
-                            ret[c.description] = c_data
-        except bleak.BleakError as e:
+                            ret[chc.description] = c_data
+        except exc.BleakError:
             """services has not been"""
         finally:
             await self.__client.disconnect()

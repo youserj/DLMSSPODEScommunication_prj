@@ -5,13 +5,14 @@ from .functools2 import open_close
 
 
 class TestType(unittest.TestCase):
-    m = Serial(port="COM13")
+    def setUp(self) -> None:
+        self.m = Serial(port="COM5")
 
-    def test_open_close(self):
+    def test_open_close(self) -> None:
         asyncio.run(open_close(self.m))
 
-    def test_Serial(self):
-        async def main(m: Serial):
+    def test_Serial(self) -> None:
+        async def main(m: Serial) -> None:
             await m.open()
             data = bytes.fromhex("7E A0 07 03 21 93 0F 01 7E")
             await m.send(data)
@@ -24,8 +25,8 @@ class TestType(unittest.TestCase):
 
         asyncio.run(main(self.m))
 
-    def test_Serial_without_recv(self):
-        async def main(m: Serial):
+    def test_Serial_without_recv(self) -> None:
+        async def main(m: Serial) -> None:
             await m.open()
             data = bytes.fromhex("7E A0 07 05 21 93 0F 01 7E")
             await m.send(data)
@@ -40,9 +41,8 @@ class TestType(unittest.TestCase):
 
         asyncio.run(main(self.m))
 
-    def test_RS485_open_close(self):
-        async def main():
-            nonlocal d1, d2
+    def test_RS485_open_close(self) -> None:
+        async def main() -> None:
             await d1.open()
             print(F"{d1.is_open()=} {medias[d1.port].n_connected=}")
             await d1.close()
@@ -56,20 +56,19 @@ class TestType(unittest.TestCase):
             print(F"{medias=}")
 
         d1 = RS485(
-            port="COM13")
+            port="COM5")
         d2 = RS485(
-            port="COM13")
+            port="COM5")
         asyncio.run(main())
 
     @staticmethod
-    async def get_response(d: Serial | RS485, data: bytes, t=3) -> bytes:
+    async def get_response(d: Serial | RS485, data: bytes, t: float = 3.0) -> bytes:
         await d.send(data)
         await asyncio.wait_for(d.receive(buf := bytearray()), t)
         return buf
 
-    def test_RS485_send_recv(self):
-        async def main():
-            nonlocal d1, d2
+    def test_RS485_send_recv(self) -> None:
+        async def main() -> None:
             await d1.open()
             await d2.open()
             print(F"{d2.is_open()=} {medias[d2.port].n_connected=}")
@@ -82,18 +81,17 @@ class TestType(unittest.TestCase):
             print(F"{medias[d1.port].n_connected=}")
 
         d1 = RS485(
-            port="COM13")
+            port="COM5")
         d2 = RS485(
-            port="COM13")
+            port="COM5")
         asyncio.run(main())
 
-    def test_RS485_send_recv_group(self):
-        async def main():
-            nonlocal d1, d2
+    def test_RS485_send_recv_group(self) -> None:
+        async def main() -> None:
             await d1.open()
             await d2.open()
             print(F"{d2.is_open()=} {medias[d2.port].n_connected=}")
-            data_wrong = bytes.fromhex("7E A0 07 03 21 93 0F 02 7E")
+            bytes.fromhex("7E A0 07 03 21 93 0F 02 7E")  # data wrong
             data = bytes.fromhex("7E A0 07 03 21 93 0F 01 7E")
             async with asyncio.TaskGroup() as ts:
                 t1 = ts.create_task(self.get_response(d1, data))
@@ -106,7 +104,7 @@ class TestType(unittest.TestCase):
             print(F"{medias[d1.port].n_connected=}")
 
         d1 = RS485(
-            port="COM13")
+            port="COM5")
         d2 = RS485(
-            port="COM13")
+            port="COM5")
         asyncio.run(main())

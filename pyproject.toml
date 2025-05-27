@@ -9,7 +9,7 @@ package-dir = {"" = "src"}
 
 [project]
 name = "DLMS_SPODES_communications"
-version = "1.4.9"
+version = "1.4.10"
 authors = [
     {name="Serj Kotilevski", email="youserj@outlook.com"}
 ]
@@ -32,3 +32,48 @@ Source = "https://github.com/youserj/DLMSSPODEScommunication_prj"
 
 [project.scripts]
 DLMS_SPODES_drivers = "DLMS_SPODES_communications:call_script"
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.5.0",
+    "ruff>=0.11",
+    "types-requests"
+]
+
+[tool.mypy]
+exclude = [
+    "build/*",
+]
+strict = true
+ignore_missing_imports = true
+disallow_any_generics = true
+explicit_package_bases = true
+
+[tool.ruff]
+src = ["src"]
+line-length = 150
+preview = true
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".tox",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+include = [
+    "src/*/*.py",
+    "examples/*/*.py",
+    "test/test_*.py"
+]
+
+[tool.ruff.lint]
+    ignore = ["SIM108"]  # ternary
+    select = [
+        "E", "F", "W", "C", "Q", "ANN", "ARG", "DTZ", "FBT", "NPY", "PGH", "PIE", "SIM", "RET", "TYP", "TCH", "YTT",
+        # "TRY",
+    ]
+    #extend-select = ["D"]

@@ -1,62 +1,65 @@
-from abc import ABC, abstractmethod
+from typing import Protocol
 from dataclasses import dataclass, field
+from contextlib import suppress
 import asyncio
 
 
 @dataclass
-class Media(ABC):
+class Media(Protocol):
     recv_size: int = field(default=0xffff, init=False)
 
-    @abstractmethod
-    async def open(self):
-        """Opens the media"""
+    async def open(self) -> None: ...
 
-    @abstractmethod
-    def is_open(self):
-        """Checks if the connection is established. Returns True, if the connection is established."""
+    def is_open(self) -> bool: ...
 
-    @abstractmethod
-    async def close(self):
-        """close media"""
+    async def close(self) -> None: ...
 
-    @abstractmethod
-    async def send(self, data: bytes, receiver=None):
-        """send data with media"""
+    async def send(self, data: bytes) -> None: ...
 
-    @abstractmethod
-    async def receive(self, buf: bytearray):
-        """receive data to media"""
-
-    @abstractmethod
-    def __repr__(self):
-        """return all properties for restore"""
+    async def receive(self, buf: bytearray) -> bool: ...
 
 
-@dataclass
-class StreamMedia(Media, ABC):
-    _reader: asyncio.StreamReader | None = field(init=False, default=None)
-    _writer: asyncio.StreamWriter | None = field(init=False, default=None)
+class StreamMedia(Media, Protocol):
+    to_recv: float
+    to_close: float
+    to_drain: float
+    _reader: asyncio.StreamReader
+    _writer: asyncio.StreamWriter
 
-    def is_open(self):
-        if self._writer:
-            return not self._writer.is_closing()
-        else:
-            return False
+    def is_open(self) -> bool:
+        return (
+            hasattr(self, "_writer")
+            and not self._writer.is_closing()
+        )
 
-    async def close(self):
+    async def close(self) -> None:
+        if not hasattr(self, "_writer"):
+            return
         if not self._writer.is_closing():
             self._writer.close()
-            await self._writer.wait_closed()
+            with suppress(asyncio.TimeoutError, ConnectionError):
+                await asyncio.wait_for(self._writer.wait_closed(), timeout=self.to_close)
 
-    async def send(self, data: bytes, receiver=None):
-        if not self._writer:
-            raise Exception("Invalid connection.")
-        await self._writer.drain()
+    async def send(self, data: bytes) -> None:
+        if self._writer is None:
+            raise RuntimeError("Writer not available")
         self._writer.write(data)
+        try:
+            await asyncio.wait_for(self._writer.drain(), timeout=self.drain_timeout)
+        except asyncio.TimeoutError:
+            raise RuntimeError(f"Drain timeout ({self.drain_timeout}s) exceeded")
 
-    async def receive(self, buf: bytearray):
-        while True:
-            buf.extend(await self._reader.read(self.recv_size))
-            if buf[-1:] == b"\x7e" and len(buf) > 1:
-                return
-            await asyncio.sleep(.000001)
+    async def receive(self, buf: bytearray) -> bool:
+        try:
+            while True:
+                data = await asyncio.wait_for(
+                    self._reader.read(self.recv_size),
+                    timeout=self.to_recv
+                )
+                if not data:  # EOF
+                    return False
+                buf.extend(data)
+                if buf.endswith(b"\x7e"):
+                    return True
+        except asyncio.TimeoutError:
+            return False
