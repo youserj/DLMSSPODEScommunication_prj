@@ -45,9 +45,9 @@ class StreamMedia(Media, Protocol):
             raise RuntimeError("Writer not available")
         self._writer.write(data)
         try:
-            await asyncio.wait_for(self._writer.drain(), timeout=self.drain_timeout)
+            await asyncio.wait_for(self._writer.drain(), timeout=self.to_drain)
         except asyncio.TimeoutError:
-            raise RuntimeError(f"Drain timeout ({self.drain_timeout}s) exceeded")
+            raise RuntimeError(f"Drain timeout ({self.to_drain}s) exceeded")
 
     async def receive(self, buf: bytearray) -> bool:
         try:

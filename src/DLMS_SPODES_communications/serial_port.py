@@ -12,7 +12,7 @@ class Serial(StreamMedia):
     baudrate: str = "9600"
     to_recv: float = 5.0
     to_close: float = 3.0
-    drain_timeout: float = 2.0
+    to_drain: float = 2.0
 
     def __repr__(self) -> str:
         params: list[str] = [F"port='{self.port}'"]
