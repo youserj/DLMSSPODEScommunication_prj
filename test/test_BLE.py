@@ -23,12 +23,17 @@ class TestType(unittest.TestCase):
     def setUp(self) -> None:
         self.m = BLEKPZ(
             # discovery_timeout='60',
-            addr="0C:1C:57:B5:C6:08")
+            # addr="0C:1C:57:B5:C6:08"
+            # addr="5C:53:10:5A:E2:4B"
+            # addr="5C:53:10:5A:DF:CD"
+            addr="5C:53:10:5A:E2:62"
+        )
 
     def test_log(self) -> None:
         logger.info("hi")
 
     def test_open_close(self) -> None:
+        asyncio.run(open_close(self.m))
         asyncio.run(open_close(self.m))
 
     def test_write_read(self) -> None:
@@ -42,9 +47,16 @@ class TestType(unittest.TestCase):
                 fut=m.receive(buf),
                 timeout=5)
             print(F"{buf.hex(' ')=}")
-            await m.close()
+            if m.is_open():
+                await m.close()
+            else:
+                print("already closed")
 
-        asyncio.run(main(self.m))
+        async def several(m: BLEKPZ) -> None:
+            for i in range(10):
+                await main(m)
+
+        asyncio.run(several(self.m))
 
     def test_search_dev(self) -> None:
         async def main() -> None:

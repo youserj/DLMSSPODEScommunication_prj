@@ -23,7 +23,7 @@ class BLEKPZ(Media):
     SEND_BUF_SIZE: int = 20
     SEND_BUF_SIZE_OLD: int = 1
     READY_OK: bytes = b"\x01"
-    __client: bleak.BleakClient
+    _client: bleak.BleakClient
     __send_buf: bytearray
     __chunk_is_send: asyncio.Event
     __send_buf_uuid: str
@@ -46,12 +46,12 @@ class BLEKPZ(Media):
     async def __connect(self) -> None:
         self.__chunk_is_send = asyncio.Event()
         """send buffer locker"""
-        self.__client = bleak.BleakClient(
+        self._client = bleak.BleakClient(
             address_or_ble_device=self.addr,
             timeout=self.discovery_timeout,
             # winrt=dict(use_cached_services=True)
         )
-        await self.__client.connect()
+        await self._client.connect()
         self._recv_buff = bytearray()
         self.__send_buf = bytearray()
         """ initiate buffer for send to server"""
@@ -70,13 +70,13 @@ class BLEKPZ(Media):
 
         await self.__connect()
         # search necessary services
-        uuid_services: tuple[str, ...] = tuple(s.uuid for s in self.__client.services)
+        uuid_services: tuple[str, ...] = tuple(s.uuid for s in self._client.services)
         if self.DLMS_SERVICE_UUID in uuid_services:
             self.__send_buf_uuid = self.DLMS_SEND_BUF_UUID
-            await self.__client.start_notify(
+            await self._client.start_notify(
                 char_specifier=self.DLMS_RECV_BUF_UUID,
                 callback=put_recv_buf)
-            await self.__client.start_notify(
+            await self._client.start_notify(
                 char_specifier=self.DLMS_READY_UUID,
                 callback=ready_handle)
         else:
@@ -85,16 +85,16 @@ class BLEKPZ(Media):
 
     def is_open(self) -> bool:
         return (
-            hasattr(self, "__client")
-            and self.__client.is_connected
+            hasattr(self, "_client")
+            and self._client.is_connected
         )
 
     async def close(self) -> None:
         """close connection with blocking until close ble session"""
-        await self.__client.disconnect()
+        await self._client.disconnect()
 
     def __repr__(self) -> str:
-        params: list[str] = [F"addr='{self.__client.address}'"]
+        params: list[str] = [F"addr='{self._client.address}'"]
         if self.discovery_timeout != self.DISCOVERY_TIMEOUT_DEFAULT:
             params.append(F"discovery_timeout={self.discovery_timeout}")
         return F"{self.__class__.__name__}({', '.join(params)})"
@@ -113,12 +113,12 @@ class BLEKPZ(Media):
 
     async def __send_chunk(self, data: bytes) -> None:
         # print(F"SEND: {data}")
-        await self.__client.write_gatt_char(self.__send_buf_uuid, data, response=True)
+        await self._client.write_gatt_char(self.__send_buf_uuid, data, response=True)
         await self.__chunk_is_send.wait()
 
     async def send(self, data: bytes) -> None:
         """"""
-        if not self.__client.is_connected:
+        if not self._client.is_connected:
             raise ConnectionError("BLE no connection")
         # TODO: add notification, see in GXNet.py
         pos: int = 0
@@ -142,12 +142,12 @@ class BLEKPZ(Media):
         ret: dict[str, bytes] = {}
         await self.__connect()
         try:
-            for s in self.__client.services:
+            for s in self._client.services:
                 for chc in s.characteristics:
                     gatt_c: GattCharacteristic = chc.obj
                     if gatt_c.characteristic_properties == GattCharacteristicProperties.READ:
                         try:
-                            c_data = await self.__client.read_gatt_char(chc)
+                            c_data = await self._client.read_gatt_char(chc)
                         except Exception as e:
                             c_data = e.args[0]
                         finally:
@@ -155,5 +155,5 @@ class BLEKPZ(Media):
         except exc.BleakError:
             """services has not been"""
         finally:
-            await self.__client.disconnect()
+            await self._client.disconnect()
         return ret
