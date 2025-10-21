@@ -62,7 +62,7 @@ class TestType(unittest.TestCase):
         asyncio.run(main())
 
     @staticmethod
-    async def get_response(d: Serial | RS485, data: bytes, t: float = 3.0) -> bytes:
+    async def get_response(d: Serial | RS485, data: bytes, t: float = 3.0) -> bytearray:
         await d.send(data)
         await asyncio.wait_for(d.receive(buf := bytearray()), t)
         return buf
@@ -80,9 +80,9 @@ class TestType(unittest.TestCase):
             await d1.close()
             print(F"{medias[d1.port].n_connected=}")
 
-        d1 = RS485(
+        d1 = RS485.get_instance(
             port="COM5")
-        d2 = RS485(
+        d2 = RS485.get_instance(
             port="COM5")
         asyncio.run(main())
 
@@ -91,7 +91,7 @@ class TestType(unittest.TestCase):
             await d1.open()
             await d2.open()
             print(F"{d2.is_open()=} {medias[d2.port].n_connected=}")
-            bytes.fromhex("7E A0 07 03 21 93 0F 02 7E")  # data wrong
+            # data = bytes.fromhex("7E A0 07 03 21 93 0F 02 7E")  # data wrong
             data = bytes.fromhex("7E A0 07 03 21 93 0F 01 7E")
             async with asyncio.TaskGroup() as ts:
                 t1 = ts.create_task(self.get_response(d1, data))
@@ -103,8 +103,8 @@ class TestType(unittest.TestCase):
             await d1.close()
             print(F"{medias[d1.port].n_connected=}")
 
-        d1 = RS485(
+        d1 = RS485.get_instance(
             port="COM5")
-        d2 = RS485(
+        d2 = RS485.get_instance(
             port="COM5")
         asyncio.run(main())

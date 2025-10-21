@@ -137,9 +137,9 @@ class BLEKPZ(Media):
             return_adv=True
         )
 
-    async def get_characteristics(self) -> dict[str, bytes]:
+    async def get_characteristics(self) -> dict[str, bytearray]:
         """todo: need refactoring with translate exception to outside"""
-        ret: dict[str, bytes] = {}
+        ret: dict[str, bytearray] = {}
         await self.__connect()
         try:
             for s in self._client.services:

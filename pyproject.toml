@@ -9,13 +9,12 @@ package-dir = {"" = "src"}
 
 [project]
 name = "DLMS_SPODES_communications"
-version = "1.4.12"
+version = "1.4.13"
 authors = [
     {name="Serj Kotilevski", email="youserj@outlook.com"}
 ]
 dependencies = [
-    "bleak==0.22.2",
-    "pyserial>=3.5",
+    "bleak>=0.22.3",
     "pyserial-asyncio>=0.6"
 ]
 description="dlms-spodes"
@@ -35,6 +34,8 @@ DLMS_SPODES_drivers = "DLMS_SPODES_communications:call_script"
 
 [project.optional-dependencies]
 dev = [
+    "build>=1.2",
+    "twine>=6",
     "mypy>=1.5.0",
     "ruff>=0.11",
     "types-requests"

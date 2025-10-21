@@ -38,9 +38,11 @@ class Serial(StreamMedia):
 class RS485(Serial):
     lock: asyncio.Lock = field(init=False, default=asyncio.Lock())
 
-    def __new__(cls,
-                port: str,
-                baudrate: str = "9600") -> "RS485":
+    @classmethod
+    def get_instance(
+            cls,
+            port: str,
+            baudrate: str = "9600") -> "RS485":
         if port not in medias:
             new = RS485(port, baudrate)
             medias[port] = SerialConnector(new, 0)
@@ -50,18 +52,20 @@ class RS485(Serial):
         return medias[port].instance
 
     async def open(self) -> None:
-        if medias[self.port].n_connected == 0:  # no one connected
-            await super().open()
-        else:
-            print("already open:", medias)
-        medias[self.port].n_connected += 1
+        async with self.lock:
+            if medias[self.port].n_connected == 0:  # no one connected
+                await super().open()
+            else:
+                print("already open:", medias)
+            medias[self.port].n_connected += 1
 
     async def close(self) -> None:
-        if medias[self.port].n_connected <= 1:  # one connected
-            await super().close()
-        else:
-            print("has more one opened:", medias)
-        medias[self.port].n_connected -= 1
+        async with self.lock:
+            if medias[self.port].n_connected <= 1:  # one connected
+                await super().close()
+            else:
+                print("has more one opened:", medias)
+            medias[self.port].n_connected -= 1
 
     async def send(self, data: bytes) -> None:
         await self.lock.acquire()
