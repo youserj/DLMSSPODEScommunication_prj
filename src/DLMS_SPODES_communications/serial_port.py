@@ -48,11 +48,12 @@ class RS485(Serial):
     def get_instance(
             cls,
             port: str,
+            to_recv: float = 10.0,
             to_connection: float = 1.0,
             baudrate: str = "9600"
     ) -> "RS485":
         if port not in medias:
-            new = RS485(port=port, baudrate=baudrate, to_connection=to_connection)
+            new = RS485(port=port, baudrate=baudrate, to_connection=to_connection, to_recv=to_recv)
             medias[port] = SerialConnector(new, 0)
             # medias[port][0].alien_frames = list()
         else:
