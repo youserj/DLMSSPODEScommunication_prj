@@ -22,11 +22,11 @@ logger.info("start")
 class TestType(unittest.TestCase):
     def setUp(self) -> None:
         self.m = BLEKPZ(
-            # discovery_timeout='60',
+            # to_connection='60',
             # addr="0C:1C:57:B5:C6:08"
             # addr="5C:53:10:5A:E2:4B"
             # addr="5C:53:10:5A:DF:CD"
-            addr="5C:53:10:5A:E2:62"
+            addr="38:3B:26:EC:DE:FE"
         )
 
     def test_log(self) -> None:

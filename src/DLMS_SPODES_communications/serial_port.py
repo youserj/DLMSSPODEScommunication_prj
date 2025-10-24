@@ -2,6 +2,7 @@ import asyncio
 from dataclasses import dataclass, field
 from serial_asyncio import open_serial_connection
 from .base import StreamMedia
+from StructResult import result
 
 BAUD_RATE: str = "9600"
 
@@ -10,6 +11,7 @@ BAUD_RATE: str = "9600"
 class Serial(StreamMedia):
     port: str = "COM3"
     baudrate: str = "9600"
+    to_connection: float = 3.0
     to_recv: float = 5.0
     to_close: float = 3.0
     to_drain: float = 2.0
@@ -20,11 +22,15 @@ class Serial(StreamMedia):
             params.append(F"baudrate={self.baudrate}")
         return F"{self.__class__.__name__}({', '.join(params)})"
 
-    async def open(self) -> None:
+    async def open(self) -> result.Ok | result.Error:
         """ coroutine start """
-        self._reader, self._writer = await open_serial_connection(
-            url=self.port,
-            baudrate=self.baudrate)
+        try:
+            self._reader, self._writer = await open_serial_connection(
+                url=self.port,
+                baudrate=self.baudrate)
+            return result.OK
+        except Exception as e:  # todo: make with concrete Exceptions
+            return result.Error.from_e(e)
 
     async def close(self) -> None:
         await asyncio.sleep(.1)  # need delay before close writer
@@ -42,22 +48,26 @@ class RS485(Serial):
     def get_instance(
             cls,
             port: str,
-            baudrate: str = "9600") -> "RS485":
+            to_connection: float = 1.0,
+            baudrate: str = "9600"
+    ) -> "RS485":
         if port not in medias:
-            new = RS485(port, baudrate)
+            new = RS485(port=port, baudrate=baudrate, to_connection=to_connection)
             medias[port] = SerialConnector(new, 0)
             # medias[port][0].alien_frames = list()
         else:
             pass
         return medias[port].instance
 
-    async def open(self) -> None:
+    async def open(self) -> result.Ok | result.Error:
         async with self.lock:
             if medias[self.port].n_connected == 0:  # no one connected
-                await super().open()
+                if isinstance(res_open := await super().open(), result.Error):
+                    return res_open
             else:
                 print("already open:", medias)
             medias[self.port].n_connected += 1
+        return result.OK
 
     async def close(self) -> None:
         async with self.lock:

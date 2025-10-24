@@ -6,7 +6,7 @@ from .functools2 import open_close
 
 class TestType(unittest.TestCase):
     def setUp(self) -> None:
-        self.m = Serial(port="COM5")
+        self.m = Serial(port="COM6")
 
     def test_open_close(self) -> None:
         asyncio.run(open_close(self.m))
@@ -55,10 +55,10 @@ class TestType(unittest.TestCase):
             await d1.close()
             print(F"{medias=}")
 
-        d1 = RS485(
-            port="COM5")
-        d2 = RS485(
-            port="COM5")
+        d1 = RS485.get_instance(
+            port="COM6")
+        d2 = RS485.get_instance(
+            port="COM6")
         asyncio.run(main())
 
     @staticmethod
@@ -81,9 +81,9 @@ class TestType(unittest.TestCase):
             print(F"{medias[d1.port].n_connected=}")
 
         d1 = RS485.get_instance(
-            port="COM5")
+            port="COM6")
         d2 = RS485.get_instance(
-            port="COM5")
+            port="COM6")
         asyncio.run(main())
 
     def test_RS485_send_recv_group(self) -> None:
@@ -104,7 +104,7 @@ class TestType(unittest.TestCase):
             print(F"{medias[d1.port].n_connected=}")
 
         d1 = RS485.get_instance(
-            port="COM5")
+            port="COM6")
         d2 = RS485.get_instance(
-            port="COM5")
+            port="COM6")
         asyncio.run(main())

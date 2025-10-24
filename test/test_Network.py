@@ -7,8 +7,10 @@ from .functools2 import open_close
 class TestType(unittest.TestCase):
     def setUp(self) -> None:
         self.m = Network(
-            host="127.0.0.1",
-            port="10000")
+            host="178.170.223.217",
+            port="8888",
+            to_connection=2
+        )
         print(repr(self.m))
 
     def test_open_close(self) -> None:

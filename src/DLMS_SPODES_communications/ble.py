@@ -1,6 +1,8 @@
 import asyncio
 import os
 import bleak
+from StructResult import result
+
 from .base import Media
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
@@ -12,6 +14,10 @@ if os.name == "nt":
     import winrt.windows.foundation.collections  # use for pyinstaller
 elif os.name == "posix":
     """skip, not available"""
+
+
+DISCOVERY_TIMEOUT_DEFAULT: float = 10.0
+"""in sec"""
 
 
 class BLEKPZ(Media):
@@ -27,20 +33,18 @@ class BLEKPZ(Media):
     __send_buf: bytearray
     __chunk_is_send: asyncio.Event
     __send_buf_uuid: str
-    DISCOVERY_TIMEOUT_DEFAULT: int = 10
-    """in sec"""
     OCTET_TIMEOUT_DEFAULT: float = 1.0
     """in sec"""
     addr: str
 
     def __init__(self,
                  addr: str,
-                 discovery_timeout: str = "10") -> None:
+                 to_connection: float = DISCOVERY_TIMEOUT_DEFAULT) -> None:
         """ address: bluetooth mac address.
         port : Client port number. """
         self.addr = addr
         """bluetooth mac address"""
-        self.discovery_timeout = int(discovery_timeout)
+        self.to_connection = to_connection
         self._octet_timeout = self.OCTET_TIMEOUT_DEFAULT
 
     async def __connect(self) -> None:
@@ -48,7 +52,7 @@ class BLEKPZ(Media):
         """send buffer locker"""
         self._client = bleak.BleakClient(
             address_or_ble_device=self.addr,
-            timeout=self.discovery_timeout,
+            timeout=self.to_connection,
             # winrt=dict(use_cached_services=True)
         )
         await self._client.connect()
@@ -57,7 +61,7 @@ class BLEKPZ(Media):
         """ initiate buffer for send to server"""
         self._buf_locker = asyncio.Lock()
 
-    async def open(self) -> None:
+    async def open(self) -> result.Ok | result.Error:
         async def put_recv_buf(_sender: characteristic.BleakGATTCharacteristic, data: bytearray) -> None:
             async with self._buf_locker:
                 self._recv_buff.extend(data)
@@ -68,7 +72,11 @@ class BLEKPZ(Media):
             else:
                 raise ConnectionError(F"got {ack=!r}, expected {self.READY_OK!r}")
 
-        await self.__connect()
+        try:
+            async with asyncio.timeout(self.to_connection):
+                await self.__connect()
+        except TimeoutError as e:
+            return result.Error.from_e(e)
         # search necessary services
         uuid_services: tuple[str, ...] = tuple(s.uuid for s in self._client.services)
         if self.DLMS_SERVICE_UUID in uuid_services:
@@ -79,9 +87,10 @@ class BLEKPZ(Media):
             await self._client.start_notify(
                 char_specifier=self.DLMS_READY_UUID,
                 callback=ready_handle)
-        else:
-            await self.close()
-        self._recv_buff.clear()
+            self._recv_buff.clear()
+            return result.OK
+        await self.close()
+        return result.Error.from_e(AttributeError("not find <UUID services>"))
 
     def is_open(self) -> bool:
         return (
@@ -95,8 +104,8 @@ class BLEKPZ(Media):
 
     def __repr__(self) -> str:
         params: list[str] = [F"addr='{self._client.address}'"]
-        if self.discovery_timeout != self.DISCOVERY_TIMEOUT_DEFAULT:
-            params.append(F"discovery_timeout={self.discovery_timeout}")
+        if self.to_connection != DISCOVERY_TIMEOUT_DEFAULT:
+            params.append(F"to_connection={self.to_connection}")
         return F"{self.__class__.__name__}({', '.join(params)})"
 
     def __str__(self) -> str:
