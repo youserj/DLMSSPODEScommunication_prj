@@ -22,7 +22,7 @@ logger.info("start")
 class TestType(unittest.TestCase):
     def setUp(self) -> None:
         self.m = BLEKPZ(
-            # to_connection='60',
+            # to_connect='60',
             # addr="0C:1C:57:B5:C6:08"
             # addr="5C:53:10:5A:E2:4B"
             # addr="5C:53:10:5A:DF:CD"

@@ -1,6 +1,6 @@
 import asyncio
 import unittest
-from src.DLMS_SPODES_communications.serial_port import Serial, RS485, medias
+from src.DLMS_SPODES_communications.serial_port import Serial, RS485, medias, register_RS485
 from .functools2 import open_close
 
 
@@ -55,10 +55,10 @@ class TestType(unittest.TestCase):
             await d1.close()
             print(F"{medias=}")
 
-        d1 = RS485.get_instance(
-            port="COM6")
-        d2 = RS485.get_instance(
-            port="COM6")
+        d1 = register_RS485(RS485(
+            port="COM6"))
+        d2 = register_RS485(RS485(
+            port="COM6"))
         asyncio.run(main())
 
     @staticmethod
@@ -80,10 +80,10 @@ class TestType(unittest.TestCase):
             await d1.close()
             print(F"{medias[d1.port].n_connected=}")
 
-        d1 = RS485.get_instance(
-            port="COM6")
-        d2 = RS485.get_instance(
-            port="COM6")
+        d1 = register_RS485(RS485(
+            port="COM6"))
+        d2 = register_RS485(RS485(
+            port="COM6"))
         asyncio.run(main())
 
     def test_RS485_send_recv_group(self) -> None:
@@ -103,8 +103,8 @@ class TestType(unittest.TestCase):
             await d1.close()
             print(F"{medias[d1.port].n_connected=}")
 
-        d1 = RS485.get_instance(
-            port="COM6")
-        d2 = RS485.get_instance(
-            port="COM6")
+        d1 = register_RS485(RS485(
+            port="COM6"))
+        d2 = register_RS485(RS485(
+            port="COM6"))
         asyncio.run(main())

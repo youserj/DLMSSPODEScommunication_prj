@@ -1,4 +1,5 @@
 import asyncio
+import time
 from dataclasses import dataclass, field
 from serial_asyncio import open_serial_connection
 from .base import StreamMedia
@@ -11,7 +12,7 @@ BAUD_RATE: str = "9600"
 class Serial(StreamMedia):
     port: str = "COM3"
     baudrate: str = "9600"
-    to_connection: float = 3.0
+    to_connect: float = 3.0
     to_recv: float = 5.0
     to_close: float = 3.0
     to_drain: float = 2.0
@@ -22,13 +23,14 @@ class Serial(StreamMedia):
             params.append(F"baudrate={self.baudrate}")
         return F"{self.__class__.__name__}({', '.join(params)})"
 
-    async def open(self) -> result.Ok | result.Error:
+    async def open(self) -> result.SimpleOrError[float]:
         """ coroutine start """
+        start = time.monotonic()
         try:
             self._reader, self._writer = await open_serial_connection(
                 url=self.port,
                 baudrate=self.baudrate)
-            return result.OK
+            return result.Simple(time.monotonic() - start)
         except Exception as e:  # todo: make with concrete Exceptions
             return result.Error.from_e(e)
 
@@ -44,31 +46,12 @@ class Serial(StreamMedia):
 class RS485(Serial):
     lock: asyncio.Lock = field(init=False, default=asyncio.Lock())
 
-    @classmethod
-    def get_instance(
-            cls,
-            port: str,
-            to_recv: float = 10.0,
-            to_connection: float = 1.0,
-            baudrate: str = "9600"
-    ) -> "RS485":
-        if port not in medias:
-            new = RS485(port=port, baudrate=baudrate, to_connection=to_connection, to_recv=to_recv)
-            medias[port] = SerialConnector(new, 0)
-            # medias[port][0].alien_frames = list()
-        else:
-            pass
-        return medias[port].instance
-
-    async def open(self) -> result.Ok | result.Error:
+    async def open(self) -> result.SimpleOrError[float]:
         async with self.lock:
             if medias[self.port].n_connected == 0:  # no one connected
-                if isinstance(res_open := await super().open(), result.Error):
-                    return res_open
-            else:
-                print("already open:", medias)
+                return await super().open()
             medias[self.port].n_connected += 1
-        return result.OK
+        return result.Simple(0.0).append_e(ValueError("already open"))
 
     async def close(self) -> None:
         async with self.lock:
@@ -95,3 +78,12 @@ class SerialConnector:
 
 
 medias: dict[str, SerialConnector] = {}
+
+
+def register_RS485(media: RS485) -> "RS485":
+    if media.port not in medias:
+        medias[media.port] = SerialConnector(media, 0)
+        # medias[port][0].alien_frames = []
+    else:
+        pass
+    return medias[media.port].instance

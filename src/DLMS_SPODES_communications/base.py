@@ -8,12 +8,12 @@ from StructResult import result
 @dataclass
 class Media(Protocol):
     recv_size: int = field(default=0xffff, init=False)
-    to_connection: float
+    to_connect: float
     to_recv: float
     to_close: float
-    to_drain: float
 
-    async def open(self) -> result.Ok | result.Error: ...
+    async def open(self) -> result.SimpleOrError[float]:
+        """get connection time"""
 
     def is_open(self) -> bool: ...
 
@@ -27,6 +27,7 @@ class Media(Protocol):
 class StreamMedia(Media, Protocol):
     _reader: asyncio.StreamReader
     _writer: asyncio.StreamWriter
+    to_drain: float
 
     def is_open(self) -> bool:
         return (

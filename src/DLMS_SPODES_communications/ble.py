@@ -1,8 +1,10 @@
 import asyncio
+from dataclasses import dataclass, field
+from typing import ClassVar
 import os
 import bleak
 from StructResult import result
-
+import time
 from .base import Media
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
@@ -20,39 +22,32 @@ DISCOVERY_TIMEOUT_DEFAULT: float = 10.0
 """in sec"""
 
 
+@dataclass
 class BLEKPZ(Media):
     """KPZ implemented"""
-    DLMS_SERVICE_UUID: str = "0000ffe5-0000-1000-8000-00805f9b34fb"
-    DLMS_RECV_BUF_UUID: str = "0000fff4-0000-1000-8000-00805f9b34fb"
-    DLMS_SEND_BUF_UUID: str = "0000fff5-0000-1000-8000-00805f9b34fb"
-    DLMS_READY_UUID: str = "0000ffe0-0000-1000-8000-00805f9b34fb"
-    SEND_BUF_SIZE: int = 20
-    SEND_BUF_SIZE_OLD: int = 1
-    READY_OK: bytes = b"\x01"
-    _client: bleak.BleakClient
-    __send_buf: bytearray
-    __chunk_is_send: asyncio.Event
-    __send_buf_uuid: str
-    OCTET_TIMEOUT_DEFAULT: float = 1.0
-    """in sec"""
-    addr: str
-
-    def __init__(self,
-                 addr: str,
-                 to_connection: float = DISCOVERY_TIMEOUT_DEFAULT) -> None:
-        """ address: bluetooth mac address.
-        port : Client port number. """
-        self.addr = addr
-        """bluetooth mac address"""
-        self.to_connection = to_connection
-        self._octet_timeout = self.OCTET_TIMEOUT_DEFAULT
+    addr: str = "00:00:00:00:00:00"
+    "mac address"
+    to_connect: float = DISCOVERY_TIMEOUT_DEFAULT
+    to_recv: float = 1.0
+    to_close: float = 10.0
+    DLMS_SERVICE_UUID: ClassVar[str] = "0000ffe5-0000-1000-8000-00805f9b34fb"
+    DLMS_RECV_BUF_UUID: ClassVar[str] = "0000fff4-0000-1000-8000-00805f9b34fb"
+    DLMS_SEND_BUF_UUID: ClassVar[str] = "0000fff5-0000-1000-8000-00805f9b34fb"
+    DLMS_READY_UUID: ClassVar[str] = "0000ffe0-0000-1000-8000-00805f9b34fb"
+    SEND_BUF_SIZE: ClassVar[int] = 20
+    SEND_BUF_SIZE_OLD: ClassVar[int] = 1
+    READY_OK: ClassVar[bytes] = b"\x01"
+    _client: bleak.BleakClient = field(init=False)
+    __send_buf: bytearray = field(init=False)
+    __chunk_is_send: asyncio.Event = field(init=False)
+    __send_buf_uuid: str = field(init=False)
 
     async def __connect(self) -> None:
         self.__chunk_is_send = asyncio.Event()
         """send buffer locker"""
         self._client = bleak.BleakClient(
             address_or_ble_device=self.addr,
-            timeout=self.to_connection,
+            timeout=self.to_connect,
             # winrt=dict(use_cached_services=True)
         )
         await self._client.connect()
@@ -61,7 +56,7 @@ class BLEKPZ(Media):
         """ initiate buffer for send to server"""
         self._buf_locker = asyncio.Lock()
 
-    async def open(self) -> result.Ok | result.Error:
+    async def open(self) -> result.SimpleOrError[float]:
         async def put_recv_buf(_sender: characteristic.BleakGATTCharacteristic, data: bytearray) -> None:
             async with self._buf_locker:
                 self._recv_buff.extend(data)
@@ -72,8 +67,9 @@ class BLEKPZ(Media):
             else:
                 raise ConnectionError(F"got {ack=!r}, expected {self.READY_OK!r}")
 
+        start = time.monotonic()
         try:
-            async with asyncio.timeout(self.to_connection):
+            async with asyncio.timeout(self.to_connect):
                 await self.__connect()
         except TimeoutError as e:
             return result.Error.from_e(e)
@@ -88,7 +84,7 @@ class BLEKPZ(Media):
                 char_specifier=self.DLMS_READY_UUID,
                 callback=ready_handle)
             self._recv_buff.clear()
-            return result.OK
+            return result.Simple(time.monotonic() - start)
         await self.close()
         return result.Error.from_e(AttributeError("not find <UUID services>"))
 
@@ -104,8 +100,8 @@ class BLEKPZ(Media):
 
     def __repr__(self) -> str:
         params: list[str] = [F"addr='{self._client.address}'"]
-        if self.to_connection != DISCOVERY_TIMEOUT_DEFAULT:
-            params.append(F"to_connection={self.to_connection}")
+        if self.to_connect != DISCOVERY_TIMEOUT_DEFAULT:
+            params.append(F"to_connect={self.to_connect}")
         return F"{self.__class__.__name__}({', '.join(params)})"
 
     def __str__(self) -> str:
@@ -135,7 +131,7 @@ class BLEKPZ(Media):
             self.__chunk_is_send.clear()
             await asyncio.wait_for(
                 fut=self.__send_chunk(c_data),
-                timeout=self._octet_timeout)
+                timeout=self.to_recv)
             pos += self.SEND_BUF_SIZE
 
     @classmethod
