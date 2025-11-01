@@ -34,9 +34,9 @@ class Serial(StreamMedia):
         except Exception as e:  # todo: make with concrete Exceptions
             return result.Error.from_e(e)
 
-    async def close(self) -> None:
-        await asyncio.sleep(.1)  # need delay before close writer
-        await super(Serial, self).close()
+    async def close(self) -> result.SimpleOrError[float]:
+        await asyncio.sleep(.01)  # need delay before close writer
+        return await super(Serial, self).close()
 
     def __str__(self) -> str:
         return F"{self.port},{self.baudrate}"
@@ -48,18 +48,22 @@ class RS485(Serial):
 
     async def open(self) -> result.SimpleOrError[float]:
         async with self.lock:
-            if medias[self.port].n_connected == 0:  # no one connected
+            if (media := medias.get(self.port)) is None:
+                return result.Error.from_e(ConnectionError(f"no find media with {self.port}"))
+            media.n_connected += 1
+            if medias[self.port].n_connected == 1:  # first connected
                 return await super().open()
-            medias[self.port].n_connected += 1
         return result.Simple(0.0).append_e(ValueError("already open"))
 
-    async def close(self) -> None:
+    async def close(self) -> result.SimpleOrError[float]:
         async with self.lock:
-            if medias[self.port].n_connected <= 1:  # one connected
-                await super().close()
+            if (media := medias.get(self.port)) is None:
+                return result.Error.from_e(ConnectionError(f"no find media with {self.port}"))
+            media.n_connected -= 1
+            if media.n_connected <= 0:  # last connected
+                return await super().close()
             else:
-                print("has more one opened:", medias)
-            medias[self.port].n_connected -= 1
+                return result.Simple(0.0).append_e(ValueError("has more connection"))
 
     async def send(self, data: bytes) -> None:
         await self.lock.acquire()

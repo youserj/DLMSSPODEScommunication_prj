@@ -94,9 +94,11 @@ class BLEKPZ(Media):
             and self._client.is_connected
         )
 
-    async def close(self) -> None:
+    async def close(self) -> result.SimpleOrError[float]:
         """close connection with blocking until close ble session"""
+        start = time.monotonic()
         await self._client.disconnect()
+        return result.Simple(time.monotonic() - start)
 
     def __repr__(self) -> str:
         params: list[str] = [F"addr='{self._client.address}'"]

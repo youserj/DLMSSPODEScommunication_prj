@@ -2,6 +2,7 @@ from typing import Protocol
 from dataclasses import dataclass, field
 from contextlib import suppress
 import asyncio
+import time
 from StructResult import result
 
 
@@ -17,7 +18,8 @@ class Media(Protocol):
 
     def is_open(self) -> bool: ...
 
-    async def close(self) -> None: ...
+    async def close(self) ->  result.SimpleOrError[float]:
+        """return disconnection time"""
 
     async def send(self, data: bytes) -> None: ...
 
@@ -35,13 +37,19 @@ class StreamMedia(Media, Protocol):
             and not self._writer.is_closing()
         )
 
-    async def close(self) -> None:
+    async def close(self) -> result.SimpleOrError[float]:
+        start = time.monotonic()
         if not hasattr(self, "_writer"):
-            return
+            return result.Error.from_e(ConnectionError("no stream writer available"))
         if not self._writer.is_closing():
             self._writer.close()
-            with suppress(asyncio.TimeoutError, ConnectionError):
+            try:
                 await asyncio.wait_for(self._writer.wait_closed(), timeout=self.to_close)
+                # await asyncio.sleep(0.1)
+            except (asyncio.TimeoutError, ConnectionError) as e:
+                self._writer.transport.abort()
+                return result.Error.from_e(ConnectionError("close timeout"))
+        return result.Simple(time.monotonic() - start)
 
     async def send(self, data: bytes) -> None:
         if self._writer is None:
