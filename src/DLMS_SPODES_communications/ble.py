@@ -118,6 +118,9 @@ class BLEKPZ(Media):
                 return True
             await asyncio.sleep(.000001)
 
+    async def end_transaction(self) -> None:
+        ...
+
     async def __send_chunk(self, data: bytes) -> None:
         # print(F"SEND: {data}")
         await self._client.write_gatt_char(self.__send_buf_uuid, data, response=True)

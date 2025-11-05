@@ -8,36 +8,46 @@ from StructResult import result
 
 @dataclass
 class Media(Protocol):
+    """Base interface for media connections (network, serial, etc.)"""
     recv_size: int = field(default=0xffff, init=False)
     to_connect: float
     to_recv: float
     to_close: float
 
     async def open(self) -> result.SimpleOrError[float]:
-        """get connection time"""
+        """Establish connection and return connection time or error"""
 
-    def is_open(self) -> bool: ...
+    def is_open(self) -> bool:
+        """Check if connection is currently open"""
 
     async def close(self) ->  result.SimpleOrError[float]:
-        """return disconnection time"""
+        """Close connection and return disconnection time or error"""
 
-    async def send(self, data: bytes) -> None: ...
+    async def send(self, data: bytes) -> None:
+        """Send data through the connection"""
 
-    async def receive(self, buf: bytearray) -> bool: ...
+    async def receive(self, buf: bytearray) -> bool:
+        """Receive data into buffer, return True if complete message received"""
 
+    async def end_transaction(self) -> None:
+        """End current transaction and release resources"""
+    
 
 class StreamMedia(Media, Protocol):
+    """Stream-based media implementation using asyncio StreamReader/StreamWriter"""
     _reader: asyncio.StreamReader
     _writer: asyncio.StreamWriter
     to_drain: float
 
     def is_open(self) -> bool:
+        """Check if stream writer exists and is not closing"""
         return (
             hasattr(self, "_writer")
             and not self._writer.is_closing()
         )
 
     async def close(self) -> result.SimpleOrError[float]:
+        """Close stream connection with timeout handling"""
         start = time.monotonic()
         if not hasattr(self, "_writer"):
             return result.Error.from_e(ConnectionError("no stream writer available"))
@@ -52,6 +62,7 @@ class StreamMedia(Media, Protocol):
         return result.Simple(time.monotonic() - start)
 
     async def send(self, data: bytes) -> None:
+        """Write data to stream and wait for buffer to drain"""
         if self._writer is None:
             raise RuntimeError("Writer not available")
         self._writer.write(data)
@@ -61,6 +72,14 @@ class StreamMedia(Media, Protocol):
             raise RuntimeError(f"Drain timeout ({self.to_drain}s) exceeded")
 
     async def receive(self, buf: bytearray) -> bool:
+        """
+        Receive data from stream until end marker or timeout
+        Args:
+            buf: Buffer to append received data to
+        Returns:
+            bool: True if complete message received (ending with b"\\x7e"), 
+                  False on timeout or EOF
+        """
         try:
             while True:
                 data = await asyncio.wait_for(

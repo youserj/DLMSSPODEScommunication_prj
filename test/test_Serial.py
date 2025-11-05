@@ -48,7 +48,7 @@ class TestType(unittest.TestCase):
             print(F"{d1.is_open()=} {medias[d1.port].n_connected=}\n")
             await d1.close()
             await d2.open()
-            await d1.lock.acquire()
+            await d1._lock.acquire()
             print(F"{d2.is_open()=} {medias[d2.port].n_connected=}\n")
             await d1.open()
             print(F"{d1.is_open()=} {medias[d1.port].n_connected=}\n")

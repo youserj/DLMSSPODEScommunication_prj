@@ -57,5 +57,8 @@ class Network(StreamMedia):
             except Exception as e:
                 return result.Error.from_e(e, CONN_ERROR)
 
+    async def end_transaction(self) -> None:
+        ...
+
     def __str__(self) -> str:
         return F"{self.host}:{self.port}"

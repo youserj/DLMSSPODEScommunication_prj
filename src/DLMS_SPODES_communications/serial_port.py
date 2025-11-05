@@ -38,16 +38,22 @@ class Serial(StreamMedia):
         await asyncio.sleep(.01)  # need delay before close writer
         return await super(Serial, self).close()
 
+    async def end_transaction(self) -> None:
+        ...
+
     def __str__(self) -> str:
         return F"{self.port},{self.baudrate}"
 
 
 @dataclass
 class RS485(Serial):
-    lock: asyncio.Lock = field(init=False, default=asyncio.Lock())
+    to_line: float = 5.0
+    """line timeout"""
+    _lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock)
+    _in_transaction: bool = field(init=False, default=False)
 
     async def open(self) -> result.SimpleOrError[float]:
-        async with self.lock:
+        async with self._lock:
             if (media := medias.get(self.port)) is None:
                 return result.Error.from_e(ConnectionError(f"no find media with {self.port}"))
             media.n_connected += 1
@@ -56,7 +62,7 @@ class RS485(Serial):
         return result.Simple(0.0).append_e(ValueError("already open"))
 
     async def close(self) -> result.SimpleOrError[float]:
-        async with self.lock:
+        async with self._lock:
             if (media := medias.get(self.port)) is None:
                 return result.Error.from_e(ConnectionError(f"no find media with {self.port}"))
             media.n_connected -= 1
@@ -66,13 +72,30 @@ class RS485(Serial):
                 return result.Simple(0.0).append_e(ValueError("has more connection"))
 
     async def send(self, data: bytes) -> None:
-        await self.lock.acquire()
-        await super().send(data)
+        try:
+            await asyncio.wait_for(self._lock.acquire(), 
+                                 timeout=self.to_line)
+        except asyncio.TimeoutError:
+            raise RuntimeError("Cannot acquire transaction lock - timeout")
+        self._in_transaction = True
+        try:
+            await super().send(data)
+        except Exception as e:
+            self._cleanup_transaction()
+            raise e
 
     async def receive(self, buf: bytearray) -> bool:
-        res = await super(RS485, self).receive(buf)
-        self.lock.release()
-        return res
+        if not self._in_transaction:
+            raise RuntimeError("Receive outside transaction")
+        return await super().receive(buf)
+
+    async def end_transaction(self) -> None:
+        self._cleanup_transaction()
+
+    def _cleanup_transaction(self) -> None:
+        if self._in_transaction:
+            self._in_transaction = False
+            self._lock.release()
 
 
 @dataclass

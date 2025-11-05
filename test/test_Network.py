@@ -23,13 +23,13 @@ class TestType(unittest.TestCase):
         asyncio.run(open_close(self.m))
 
     def test_multy_open_close(self) -> None:
-        async def multy():
+        async def multy() -> None:
             for _ in range(100):
                 await open_close(self.m)
         asyncio.run(multy())
 
     def test_timeout(self) -> None:
-        async def time_out():
+        async def time_out() -> None:
             await self.m.open()
             await asyncio.sleep(600)
             print(f"{self.m.is_open()=}")
@@ -42,7 +42,7 @@ class TestType(unittest.TestCase):
             port="8888",
             to_connect=40.0
         ) for _ in range(10)]
-        async def multy():
+        async def multy() -> None:
             async with asyncio.TaskGroup() as tg:
                 for m in medias:
                     print(await m.open())
