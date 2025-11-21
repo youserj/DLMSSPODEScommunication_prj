@@ -34,6 +34,22 @@
             }
         },
         {
+            "name": "Debug Ble",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "-m",
+            "args": [
+                "unittest",
+                "test.test_BLE.TestType.test_write_read",
+                "-v"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
             "name": "Debug test_multy_open_close",
             "type": "debugpy",
             "request": "launch",
@@ -134,12 +150,14 @@
             }
         },
         {
-            "name": "Python Debugger: Python File",
+            "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
-            "program": "${pathSeparator}",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+            "PYTHONPATH": "${workspaceFolder}"
             }
         }
     ]

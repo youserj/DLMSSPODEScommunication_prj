@@ -4,6 +4,7 @@ from src.DLMS_SPODES_communications.ble import BLEKPZ
 from .functools2 import open_close
 import logging
 import sys
+from StructResult import result
 
 
 logger = logging.getLogger(__name__)
@@ -17,16 +18,21 @@ handler.setFormatter(logging.Formatter(
 ))
 logger.addHandler(handler)
 logger.info("start")
+import os
 
 
 class TestType(unittest.TestCase):
     def setUp(self) -> None:
+        print(f"{os.name=}")
         self.m = BLEKPZ(
-            # to_connect='60',
+            to_connect=20.0,
+            to_recv=20.0,
             # addr="0C:1C:57:B5:C6:08"
             # addr="5C:53:10:5A:E2:4B"
             # addr="5C:53:10:5A:DF:CD"
-            addr="38:3B:26:EC:DE:FE"
+            # addr="66:84:46:05:AC:24"
+            # addr="DC:32:62:44:AE:0F"
+            addr="D8:B6:73:0A:0C:99"
         )
 
     def test_log(self) -> None:
@@ -38,7 +44,8 @@ class TestType(unittest.TestCase):
 
     def test_write_read(self) -> None:
         async def main(m: BLEKPZ) -> None:
-            await m.open()
+            if isinstance(res_open := await m.open(), result.Error):
+                raise ValueError("Open error")
             print(F"{m.is_open()=}")
             data = b"~\xa0\x14\x02!!\x93u\x12\x81\x80\x07\x05\x02\x04\x00\x06\x01\xef\xcb\xb3~"
             await m.send(data)
@@ -60,7 +67,7 @@ class TestType(unittest.TestCase):
 
     def test_search_dev(self) -> None:
         async def main() -> None:
-            for k, v in (await BLEKPZ.search(5)).items():
+            for k, v in (await BLEKPZ.search(10)).items():
                 print(k, v)
 
         asyncio.run(main())

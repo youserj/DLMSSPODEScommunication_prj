@@ -38,7 +38,7 @@ class TestType(unittest.TestCase):
 
     def test_cooperative_open_close(self) -> None:
         medias = [Network(
-            host="178.170.223.243",
+            host="178.170.223.217",
             port="8888",
             to_connect=40.0
         ) for _ in range(10)]

@@ -71,7 +71,7 @@ class BLEKPZ(Media):
         try:
             async with asyncio.timeout(self.to_connect):
                 await self.__connect()
-        except TimeoutError as e:
+        except (exc.BleakError, TimeoutError) as e:
             return result.Error.from_e(e)
         # search necessary services
         uuid_services: tuple[str, ...] = tuple(s.uuid for s in self._client.services)
