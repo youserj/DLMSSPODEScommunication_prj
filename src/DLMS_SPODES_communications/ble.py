@@ -30,63 +30,85 @@ class BLEKPZ(Media):
     to_connect: float = DISCOVERY_TIMEOUT_DEFAULT
     to_recv: float = 1.0
     to_close: float = 10.0
+    pair: bool = False
     DLMS_SERVICE_UUID: ClassVar[str] = "0000ffe5-0000-1000-8000-00805f9b34fb"
     DLMS_RECV_BUF_UUID: ClassVar[str] = "0000fff4-0000-1000-8000-00805f9b34fb"
     DLMS_SEND_BUF_UUID: ClassVar[str] = "0000fff5-0000-1000-8000-00805f9b34fb"
     DLMS_READY_UUID: ClassVar[str] = "0000ffe0-0000-1000-8000-00805f9b34fb"
-    SEND_BUF_SIZE: ClassVar[int] = 20
-    SEND_BUF_SIZE_OLD: ClassVar[int] = 1
     READY_OK: ClassVar[bytes] = b"\x01"
+    EOF: ClassVar[bytes] = b"\x7e"
+    is_first_recv_chunk: bool = True
     _client: bleak.BleakClient = field(init=False)
-    __send_buf: bytearray = field(init=False)
     __chunk_is_send: asyncio.Event = field(init=False)
-    __send_buf_uuid: str = field(init=False)
+    __c_send: characteristic.BleakGATTCharacteristic = field(init=False)
 
     async def __connect(self) -> None:
         self.__chunk_is_send = asyncio.Event()
         """send buffer locker"""
         self._client = bleak.BleakClient(
             address_or_ble_device=self.addr,
+            services=(self.DLMS_SERVICE_UUID,),
             timeout=self.to_connect,
+            pair=self.pair,
             # winrt=dict(use_cached_services=True)
         )
         await self._client.connect()
         self._recv_buff = bytearray()
-        self.__send_buf = bytearray()
         """ initiate buffer for send to server"""
         self._buf_locker = asyncio.Lock()
+        self._eof_detected = asyncio.Event()
 
-    async def open(self) -> result.SimpleOrError[float]:
+    async def _setup_notifications(self) -> result.Ok | result.Error:
         async def put_recv_buf(_sender: characteristic.BleakGATTCharacteristic, data: bytearray) -> None:
             async with self._buf_locker:
                 self._recv_buff.extend(data)
+                if self.is_first_recv_chunk:
+                    self.is_first_recv_chunk = False
+                    c_eof = 2
+                else:
+                    c_eof = 1
+                if data.count(self.EOF) == c_eof:
+                    self._eof_detected.set()
 
         def ready_handle(_sender: characteristic.BleakGATTCharacteristic, ack: bytearray) -> None:
             if ack == self.READY_OK:
                 self.__chunk_is_send.set()
             else:
-                raise ConnectionError(F"got {ack=!r}, expected {self.READY_OK!r}")
+                raise ConnectionError(F"got {ack=!r}, expected {self.READY_OK!r}")  # todo: make with message, non raise Callback
 
+        service = self._client.services.get_service(self.DLMS_SERVICE_UUID)
+        if not service:
+            return result.Error.from_e(AttributeError("not find <UUID services>"))
+        self.__c_send = service.get_characteristic(self.DLMS_SEND_BUF_UUID)
+        if not self.__c_send:
+            return result.Error.from_e(AttributeError("not find <SEND characteristic>"))
+        c_recv = service.get_characteristic(self.DLMS_RECV_BUF_UUID)
+        if not c_recv:
+            return result.Error.from_e(AttributeError("not find <RECV characteristic>"))
+        await self._client.start_notify(
+            char_specifier=c_recv,
+            callback=put_recv_buf)
+        c_ready = service.get_characteristic(self.DLMS_READY_UUID)
+        if not c_ready:
+            return result.Error.from_e(AttributeError("not find <READY characteristic>"))
+        await self._client.start_notify(
+            char_specifier=c_ready,
+            callback=ready_handle)
+        return result.OK
+
+    async def open(self) -> result.SimpleOrError[float]:
         start = time.monotonic()
         try:
             async with asyncio.timeout(self.to_connect):
                 await self.__connect()
         except (exc.BleakError, TimeoutError) as e:
             return result.Error.from_e(e)
-        # search necessary services
-        uuid_services: tuple[str, ...] = tuple(s.uuid for s in self._client.services)
-        if self.DLMS_SERVICE_UUID in uuid_services:
-            self.__send_buf_uuid = self.DLMS_SEND_BUF_UUID
-            await self._client.start_notify(
-                char_specifier=self.DLMS_RECV_BUF_UUID,
-                callback=put_recv_buf)
-            await self._client.start_notify(
-                char_specifier=self.DLMS_READY_UUID,
-                callback=ready_handle)
-            self._recv_buff.clear()
-            return result.Simple(time.monotonic() - start)
-        await self.close()
-        return result.Error.from_e(AttributeError("not find <UUID services>"))
+        if isinstance(res_setup := await self._setup_notifications(), result.Error):
+            await self.close()
+            return res_setup
+        self._recv_buff.clear()
+        self._eof_detected.clear()
+        return result.Simple(time.monotonic() - start)
 
     def is_open(self) -> bool:
         return (
@@ -98,6 +120,7 @@ class BLEKPZ(Media):
         """close connection with blocking until close ble session"""
         start = time.monotonic()
         await self._client.disconnect()
+        await asyncio.sleep(0.01)  # timeout before next connection
         return result.Simple(time.monotonic() - start)
 
     def __repr__(self) -> str:
@@ -110,34 +133,44 @@ class BLEKPZ(Media):
         return F"{self.addr}"
 
     async def receive(self, buf: bytearray) -> bool:
-        while True:
-            if self._recv_buff[-1:] == b"\x7e" and len(self._recv_buff) > 1:
-                async with self._buf_locker:
+        self.is_first_recv_chunk = True
+        try:
+            await asyncio.wait_for(self._eof_detected.wait(), timeout=self.to_recv)
+            async with self._buf_locker:
+                if self._recv_buff:
                     buf.extend(self._recv_buff)
                     self._recv_buff.clear()
-                return True
-            await asyncio.sleep(.000001)
-
+                    self._eof_detected.clear()
+                    return True
+            return False
+        except TimeoutError:
+            async with self._buf_locker:
+                if self._recv_buff:
+                    buf.extend(self._recv_buff)
+                    self._recv_buff.clear()
+                    self._eof_detected.clear()
+                    print(f"Received partial message due to timeout: {buf.hex()}")
+            return False
+        
     async def end_transaction(self) -> None:
-        ...
-
-    async def __send_chunk(self, data: bytes) -> None:
-        # print(F"SEND: {data}")
-        await self._client.write_gatt_char(self.__send_buf_uuid, data, response=True)
-        await self.__chunk_is_send.wait()
+        async with self._buf_locker: 
+            self._recv_buff.clear()
+            self._eof_detected.clear()
 
     async def send(self, data: bytes) -> None:
-        """"""
+        async def send_chunk(data: bytes) -> None:
+            await self._client.write_gatt_char(self.__c_send, data, response=True)
+            await self.__chunk_is_send.wait()
+
         if not self._client.is_connected:
             raise ConnectionError("BLE no connection")
-        # TODO: add notification, see in GXNet.py
         pos: int = 0
-        while c_data := data[pos: pos + self.SEND_BUF_SIZE]:
+        while c_data := data[pos: (next_pos := pos + self.__c_send.max_write_without_response_size)]:
             self.__chunk_is_send.clear()
             await asyncio.wait_for(
-                fut=self.__send_chunk(c_data),
+                fut=send_chunk(c_data),
                 timeout=self.to_recv)
-            pos += self.SEND_BUF_SIZE
+            pos = next_pos
 
     @classmethod
     async def search(cls, timeout: int) -> dict[str, tuple[BLEDevice, AdvertisementData]]:

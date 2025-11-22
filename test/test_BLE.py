@@ -31,8 +31,8 @@ class TestType(unittest.TestCase):
             # addr="5C:53:10:5A:E2:4B"
             # addr="5C:53:10:5A:DF:CD"
             # addr="66:84:46:05:AC:24"
-            # addr="DC:32:62:44:AE:0F"
-            addr="D8:B6:73:0A:0C:99"
+            addr="5C:53:10:5A:E2:48"
+            # addr="5C:53:10:5A:E2:3F"
         )
 
     def test_log(self) -> None:
@@ -50,9 +50,7 @@ class TestType(unittest.TestCase):
             data = b"~\xa0\x14\x02!!\x93u\x12\x81\x80\x07\x05\x02\x04\x00\x06\x01\xef\xcb\xb3~"
             await m.send(data)
             buf = bytearray()
-            await asyncio.wait_for(
-                fut=m.receive(buf),
-                timeout=5)
+            await m.receive(buf)
             print(F"{buf.hex(' ')=}")
             if m.is_open():
                 await m.close()
