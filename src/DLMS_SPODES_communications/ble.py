@@ -62,12 +62,7 @@ class BLEKPZ(Media):
         async def put_recv_buf(_sender: characteristic.BleakGATTCharacteristic, data: bytearray) -> None:
             async with self._buf_locker:
                 self._recv_buff.extend(data)
-                if self.is_first_recv_chunk:
-                    self.is_first_recv_chunk = False
-                    c_eof = 2
-                else:
-                    c_eof = 1
-                if data.count(self.EOF) == c_eof:
+                if data.count(self.EOF) >= 1:
                     self._eof_detected.set()
 
         def ready_handle(_sender: characteristic.BleakGATTCharacteristic, ack: bytearray) -> None:
@@ -133,7 +128,6 @@ class BLEKPZ(Media):
         return F"{self.addr}"
 
     async def receive(self, buf: bytearray) -> bool:
-        self.is_first_recv_chunk = True
         try:
             await asyncio.wait_for(self._eof_detected.wait(), timeout=self.to_recv)
             async with self._buf_locker:
