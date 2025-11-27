@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Protocol, ClassVar, Optional
 from dataclasses import dataclass, field
 from contextlib import suppress
 import asyncio
@@ -13,6 +13,7 @@ class Media(Protocol):
     to_connect: float
     to_recv: float
     to_close: float
+    EOF: Optional[bytes] = None
 
     async def open(self) -> result.SimpleOrError[float]:
         """Establish connection and return connection time or error"""
@@ -26,7 +27,7 @@ class Media(Protocol):
     async def send(self, data: bytes) -> None:
         """Send data through the connection"""
 
-    async def receive(self, buf: bytearray) -> bool:
+    async def receive(self, buf: bytearray) -> result.Ok | result.Error:
         """Receive data into buffer, return True if complete message received"""
 
     async def end_transaction(self) -> None:
@@ -71,14 +72,14 @@ class StreamMedia(Media, Protocol):
         except asyncio.TimeoutError:
             raise RuntimeError(f"Drain timeout ({self.to_drain}s) exceeded")
 
-    async def receive(self, buf: bytearray) -> bool:
+    async def receive(self, buf: bytearray) -> result.Ok | result.Error:
         """
         Receive data from stream until end marker or timeout
         Args:
             buf: Buffer to append received data to
         Returns:
-            bool: True if complete message received (ending with b"\\x7e"), 
-                  False on timeout or EOF
+            result.OK: if complete message received (ending with EOF), 
+            result.Error: TimeoutError
         """
         try:
             while True:
@@ -86,10 +87,13 @@ class StreamMedia(Media, Protocol):
                     self._reader.read(self.recv_size),
                     timeout=self.to_recv
                 )
-                if not data:  # EOF
-                    return False
+                if not data:
+                    return result.Error("no data received")
                 buf.extend(data)
-                if buf.endswith(b"\x7e"):
-                    return True
-        except asyncio.TimeoutError:
-            return False
+                if (
+                    self.EOF is None
+                    or data.count(self.EOF) >= 1
+                ):
+                    return result.OK
+        except asyncio.TimeoutError as e:
+            return result.Error.from_e(e)

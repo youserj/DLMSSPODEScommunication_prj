@@ -62,6 +62,7 @@ class RS485(Serial):
         return result.Simple(0.0).append_e(ValueError("already open"))
 
     async def close(self) -> result.SimpleOrError[float]:
+        self._cleanup_transaction()
         async with self._lock:
             if (media := medias.get(self.port)) is None:
                 return result.Error.from_e(ConnectionError(f"no find media with {self.port}"))
@@ -84,7 +85,7 @@ class RS485(Serial):
             self._cleanup_transaction()
             raise e
 
-    async def receive(self, buf: bytearray) -> bool:
+    async def receive(self, buf: bytearray) -> result.Ok | result.Error:
         if not self._in_transaction:
             raise RuntimeError("Receive outside transaction")
         return await super().receive(buf)

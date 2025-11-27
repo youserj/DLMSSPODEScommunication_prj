@@ -31,8 +31,8 @@ class TestType(unittest.TestCase):
             # addr="5C:53:10:5A:E2:4B"
             # addr="5C:53:10:5A:DF:CD"
             # addr="66:84:46:05:AC:24"
-            addr="5C:53:10:5A:E2:48"
-            # addr="5C:53:10:5A:E2:3F"
+            # addr="5C:53:10:5A:E2:48"
+            addr="5C:53:10:5A:E2:3F"
         )
 
     def test_log(self) -> None:
@@ -45,8 +45,9 @@ class TestType(unittest.TestCase):
     def test_write_read(self) -> None:
         async def main(m: BLEKPZ) -> None:
             if isinstance(res_open := await m.open(), result.Error):
+                print(res_open)
                 raise ValueError("Open error")
-            print(F"{m.is_open()=}")
+            print(F"{res_open.value=}")
             data = b"~\xa0\x14\x02!!\x93u\x12\x81\x80\x07\x05\x02\x04\x00\x06\x01\xef\xcb\xb3~"
             await m.send(data)
             buf = bytearray()

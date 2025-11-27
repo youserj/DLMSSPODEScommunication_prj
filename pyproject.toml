@@ -9,12 +9,12 @@ package-dir = {"" = "src"}
 
 [project]
 name = "DLMS_SPODES_communications"
-version = "1.5.7"
+version = "1.6.0"
 authors = [
     {name="Serj Kotilevski", email="youserj@outlook.com"}
 ]
 dependencies = [
-    "bleak>=1.1.1",
+    "bleak>=2.0.0",
     "pyserial-asyncio>=0.6",
     "StructResult>=0.9.5, <0.10"
 ]

@@ -36,7 +36,6 @@ class BLEKPZ(Media):
     DLMS_SEND_BUF_UUID: ClassVar[str] = "0000fff5-0000-1000-8000-00805f9b34fb"
     DLMS_READY_UUID: ClassVar[str] = "0000ffe0-0000-1000-8000-00805f9b34fb"
     READY_OK: ClassVar[bytes] = b"\x01"
-    EOF: ClassVar[bytes] = b"\x7e"
     is_first_recv_chunk: bool = True
     _client: bleak.BleakClient = field(init=False)
     __chunk_is_send: asyncio.Event = field(init=False)
@@ -56,14 +55,17 @@ class BLEKPZ(Media):
         self._recv_buff = bytearray()
         """ initiate buffer for send to server"""
         self._buf_locker = asyncio.Lock()
-        self._eof_detected = asyncio.Event()
+        self._data_detected = asyncio.Event()
 
     async def _setup_notifications(self) -> result.Ok | result.Error:
         async def put_recv_buf(_sender: characteristic.BleakGATTCharacteristic, data: bytearray) -> None:
             async with self._buf_locker:
                 self._recv_buff.extend(data)
-                if data.count(self.EOF) >= 1:
-                    self._eof_detected.set()
+                if (
+                    self.EOF is None
+                    or data.count(self.EOF) >= 1
+                ):
+                    self._data_detected.set()
 
         def ready_handle(_sender: characteristic.BleakGATTCharacteristic, ack: bytearray) -> None:
             if ack == self.READY_OK:
@@ -78,17 +80,20 @@ class BLEKPZ(Media):
         if not self.__c_send:
             return result.Error.from_e(AttributeError("not find <SEND characteristic>"))
         c_recv = service.get_characteristic(self.DLMS_RECV_BUF_UUID)
-        if not c_recv:
-            return result.Error.from_e(AttributeError("not find <RECV characteristic>"))
-        await self._client.start_notify(
-            char_specifier=c_recv,
-            callback=put_recv_buf)
-        c_ready = service.get_characteristic(self.DLMS_READY_UUID)
-        if not c_ready:
-            return result.Error.from_e(AttributeError("not find <READY characteristic>"))
-        await self._client.start_notify(
-            char_specifier=c_ready,
-            callback=ready_handle)
+        try:
+            if not c_recv:
+                return result.Error.from_e(AttributeError("not find <RECV characteristic>"))
+            await self._client.start_notify(
+                char_specifier=c_recv,
+                callback=put_recv_buf)
+            c_ready = service.get_characteristic(self.DLMS_READY_UUID)
+            if not c_ready:
+                return result.Error.from_e(AttributeError("not find <READY characteristic>"))
+            await self._client.start_notify(
+                char_specifier=c_ready,
+                callback=ready_handle)
+        except OSError as e:
+            return result.Error.from_e(e, "setup notification")
         return result.OK
 
     async def open(self) -> result.SimpleOrError[float]:
@@ -97,12 +102,12 @@ class BLEKPZ(Media):
             async with asyncio.timeout(self.to_connect):
                 await self.__connect()
         except (exc.BleakError, TimeoutError) as e:
-            return result.Error.from_e(e)
+            return result.Error.from_e(e, "open BLE")
         if isinstance(res_setup := await self._setup_notifications(), result.Error):
             await self.close()
             return res_setup
         self._recv_buff.clear()
-        self._eof_detected.clear()
+        self._data_detected.clear()
         return result.Simple(time.monotonic() - start)
 
     def is_open(self) -> bool:
@@ -127,29 +132,29 @@ class BLEKPZ(Media):
     def __str__(self) -> str:
         return F"{self.addr}"
 
-    async def receive(self, buf: bytearray) -> bool:
+    async def receive(self, buf: bytearray) -> result.Ok | result.Error:
         try:
-            await asyncio.wait_for(self._eof_detected.wait(), timeout=self.to_recv)
+            await asyncio.wait_for(self._data_detected.wait(), timeout=self.to_recv)
             async with self._buf_locker:
                 if self._recv_buff:
                     buf.extend(self._recv_buff)
                     self._recv_buff.clear()
-                    self._eof_detected.clear()
-                    return True
-            return False
-        except TimeoutError:
+                    self._data_detected.clear()
+                    return result.OK
+            return result.Error("no data received")
+        except asyncio.TimeoutError as e:
             async with self._buf_locker:
                 if self._recv_buff:
                     buf.extend(self._recv_buff)
                     self._recv_buff.clear()
-                    self._eof_detected.clear()
+                    self._data_detected.clear()
                     print(f"Received partial message due to timeout: {buf.hex()}")
-            return False
+            return result.Error.from_e(e)
         
     async def end_transaction(self) -> None:
         async with self._buf_locker: 
             self._recv_buff.clear()
-            self._eof_detected.clear()
+            self._data_detected.clear()
 
     async def send(self, data: bytes) -> None:
         async def send_chunk(data: bytes) -> None:
