@@ -7,7 +7,7 @@ from .functools2 import open_close
 class TestType(unittest.TestCase):
     def setUp(self) -> None:
         self.m = Serial(
-            port="COM5", 
+            port="COM5",
             to_recv=3.0
         )
 

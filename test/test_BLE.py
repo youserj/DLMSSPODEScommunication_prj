@@ -5,6 +5,7 @@ from .functools2 import open_close
 import logging
 import sys
 from StructResult import result
+import os
 
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,6 @@ handler.setFormatter(logging.Formatter(
 ))
 logger.addHandler(handler)
 logger.info("start")
-import os
 
 
 class TestType(unittest.TestCase):
