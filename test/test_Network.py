@@ -42,6 +42,7 @@ class TestType(unittest.TestCase):
             port="8888",
             to_connect=40.0
         ) for _ in range(10)]
+        
         async def multy() -> None:
             async with asyncio.TaskGroup() as tg:
                 for m in medias:
