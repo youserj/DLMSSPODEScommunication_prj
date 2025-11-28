@@ -62,7 +62,7 @@ class RS485(Serial):
         return result.Simple(0.0).append_e(ValueError("already open"))
 
     async def close(self) -> result.SimpleOrError[float]:
-        self.end_transaction()
+        self._cleanup_transaction()
         async with self._lock:
             if (media := medias.get(self.port)) is None:
                 return result.Error.from_e(ConnectionError(f"no find media with {self.port}"))
