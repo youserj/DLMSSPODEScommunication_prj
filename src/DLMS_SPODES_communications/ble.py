@@ -73,16 +73,19 @@ class BLEKPZ(Media):
             else:
                 raise ConnectionError(F"got {ack=!r}, expected {self.READY_OK!r}")  # todo: make with message, non raise Callback
 
-        service = self._client.services.get_service(self.DLMS_SERVICE_UUID)
+        try:
+            service = self._client.services.get_service(self.DLMS_SERVICE_UUID)
+        except exc.BleakError as e:
+            return result.Error.from_e(e, msg="get service")
         if not service:
             return result.Error.from_e(AttributeError("not find <UUID services>"))
         self.__c_send = service.get_characteristic(self.DLMS_SEND_BUF_UUID)
         if not self.__c_send:
             return result.Error.from_e(AttributeError("not find <SEND characteristic>"))
         c_recv = service.get_characteristic(self.DLMS_RECV_BUF_UUID)
+        if not c_recv:
+            return result.Error.from_e(AttributeError("not find <RECV characteristic>"))
         try:
-            if not c_recv:
-                return result.Error.from_e(AttributeError("not find <RECV characteristic>"))
             await self._client.start_notify(
                 char_specifier=c_recv,
                 callback=put_recv_buf)
@@ -92,9 +95,9 @@ class BLEKPZ(Media):
             await self._client.start_notify(
                 char_specifier=c_ready,
                 callback=ready_handle)
-        except OSError as e:
-            return result.Error.from_e(e, "setup notification")
-        return result.OK
+            return result.OK
+        except Exception as e:
+            return result.Error.from_e(e, msg="start notify")
 
     async def open(self) -> result.SimpleOrError[float]:
         start = time.monotonic()
