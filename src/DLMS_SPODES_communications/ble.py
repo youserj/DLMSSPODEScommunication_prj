@@ -46,7 +46,7 @@ class BLEKPZ(Media):
         """send buffer locker"""
         self._client = bleak.BleakClient(
             address_or_ble_device=self.addr,
-            services=(self.DLMS_SERVICE_UUID,),
+            # services=(self.DLMS_SERVICE_UUID,),  # don't work in windows 11 for one uuid with cache
             timeout=self.to_connect,
             pair=self.pair,
             # winrt=dict(use_cached_services=True)

@@ -32,7 +32,7 @@ class TestType(unittest.TestCase):
             # addr="5C:53:10:5A:DF:CD"
             # addr="66:84:46:05:AC:24"
             # addr="5C:53:10:5A:E2:48"
-            addr="5C:53:10:5A:E2:3F"
+            addr="3C:AB:72:5F:29:48"
         )
 
     def test_log(self) -> None:

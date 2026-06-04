@@ -34,13 +34,29 @@
             }
         },
         {
-            "name": "Debug Ble",
+            "name": "Ble write-read",
             "type": "debugpy",
             "request": "launch",
             "program": "-m",
             "args": [
                 "unittest",
                 "test.test_BLE.TestType.test_write_read",
+                "-v"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "search Ble",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "-m",
+            "args": [
+                "unittest",
+                "test.test_BLE.TestType.test_search_dev",
                 "-v"
             ],
             "console": "integratedTerminal",
